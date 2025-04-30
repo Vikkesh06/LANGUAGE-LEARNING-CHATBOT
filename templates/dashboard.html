@@ -27,6 +27,11 @@
     <div class="row">
       <!-- Sidebar -->
       <div class="col-md-3 sidebar text-white">
+        <!-- MMU Logo inside sidebar -->
+        <div class="mmu-logo-container" style="text-align: center; margin-top: 20px;">
+          <img src="{{ url_for('static', filename='MMU LOGO.png') }}" alt="MMU Logo" width="120" />
+        </div>
+
         <h4>Welcome, {{ session['username'] }}!</h4>
         <ul class="nav flex-column">
           <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}"><i class="fas fa-home"></i> Dashboard</a></li>

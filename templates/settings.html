@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings | Language Chatbot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        /* Updated Background color and design for the page */
+        body {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); /* Smooth gradient */
+            background-size: cover; /* Ensures the background covers the whole page */
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center; /* Center the content horizontally */
+            align-items: center; /* Center the content vertically */
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            position: relative; /* Allows absolute positioning of background elements */
+        }
+
+        /* Adding a subtle abstract pattern to the background */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://www.toptal.com/designers/subtlepatterns/patterns/diagonal_stripes.png'); /* Subtle texture */
+            opacity: 0.05; /* Light opacity so it doesn’t overpower the content */
+            z-index: 0;
+        }
+
+        /* Content container */
+        .settings-container {
+            background: #fff;
+            border-radius: 10px;
+            padding: 40px;
+            width: 100%;
+            max-width: 700px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            z-index: 1; /* Makes sure the container is above the background */
+        }
+
+        /* Styling for the header */
+        .settings-container h2 {
+            margin-bottom: 30px;
+            font-size: 26px;
+            color: #333;
+            text-align: center;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2); /* Adding subtle text shadow for better contrast */
+        }
+
+        .section-title {
+            font-size: 18px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #444;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            font-weight: 500;
+        }
+
+        input[type="text"], input[type="email"], input[type="password"], textarea, select, input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 15px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            margin-bottom: 15px;
+            box-sizing: border-box; /* Ensure padding doesn't increase the overall width */
+        }
+
+        /* Font style and padding for bio textarea */
+        #bio {
+            font-family: 'Arial', sans-serif;
+            font-size: 16px;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+            min-height: 120px;
+            resize: vertical;
+            background-color: #f9f9f9; /* Lighter background for bio */
+            box-sizing: border-box; /* Ensure padding doesn't increase the overall width */
+        }
+
+        /* Add a subtle hover effect to the input fields */
+        input[type="text"]:hover, input[type="email"]:hover, input[type="password"]:hover, textarea:hover, select:hover, input[type="file"]:hover {
+            border-color: #6a11cb;
+        }
+
+        button {
+            padding: 12px 20px;
+            background-color: #24292f;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background-color: #444c56;
+        }
+
+        /* Profile Picture Container */
+        .profile-picture-container {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 3px solid #ccc; /* Changed to a subtle border color */
+            border-radius: 8px;
+            display: inline-block;
+            width: 120px; /* Adjusted width */
+            height: 120px; /* Adjusted height */
+            background-color: #f3f3f3; /* Subtle background */
+        }
+
+        .profile-picture-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensures the image maintains its aspect ratio */
+            border-radius: 50%;
+        }
+
+        .profile-picture-container input[type="file"] {
+            margin-top: 10px;
+            width: 100%; /* Make file input take full width of its container */
+            box-sizing: border-box; /* Ensure padding doesn't increase the overall width */
+        }
+
+        /* URL Inputs Styling */
+        .url-inputs input {
+            margin-bottom: 10px; /* Reduced bottom margin for better spacing */
+            box-sizing: border-box; /* Ensure padding doesn't increase the overall width */
+        }
+
+        .url-inputs .add-url-btn {
+            margin-top: 10px; /* Added top margin for spacing */
+            display: inline-block;
+            color: #0366d6;
+            background: none;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 0; /* Remove default button padding */
+        }
+
+        .url-inputs .add-url-btn:hover {
+            text-decoration: underline;
+        }
+
+        .url-inputs {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Ensure the form takes full width within its container */
+        .settings-container form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Improve spacing for input fields and sections */
+        .input-field {
+            margin-bottom: 20px;
+        }
+
+        /* Success message */
+        .success-message {
+            color: green;
+            font-size: 16px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        /* Error message */
+        .error-message {
+            color: red;
+            font-size: 16px;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="settings-container">
+        <h2>Settings</h2>
+
+        {% if message %}
+        <div class="{{ message_type }}">{{ message }}</div>
+        {% endif %}
+
+        <form id="settings-form" method="POST" enctype="multipart/form-data">
+            <div class="section-title">Profile</div>
+
+            <div class="profile-picture-container">
+                <img id="profile-pic-preview" src="{{ url_for('static', filename='uploads/' + session.get('profile_picture', 'default.jpg')) }}" alt="Profile Picture">
+                <input type="file" name="profile_picture" accept="image/*" onchange="previewProfilePic(this)">
+            </div>
+
+            <div class="input-field">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Name" value="{{ session['username'] }}" required>
+            </div>
+
+            <div class="input-field">
+                <label for="email">Email</label>
+                <select id="email" name="email">
+                    <option value="">Select a verified email to display</option>
+                    {% for email in verified_emails %}
+                        <option value="{{ email }}" {% if session['email'] == email %}selected{% endif %}>{{ email }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="input-field">
+                <label for="bio">Bio</label>
+                <textarea id="bio" name="bio" placeholder="Tell us something about yourself">{{ session.get('bio', '') }}</textarea>
+            </div>
+
+            <div class="section-title">Change Password (Optional)</div>
+
+            <div class="input-field">
+                <label for="new_password">New Password</label>
+                <input type="password" id="new_password" name="new_password" placeholder="Enter new password">
+            </div>
+
+            <div class="section-title">URLs</div>
+            <div class="url-inputs">
+                <input type="text" name="url1" placeholder="https://example.com" value="{{ session.get('url1', '') }}">
+                <input type="text" name="url2" placeholder="http://twitter.com/yourhandle" value="{{ session.get('url2', '') }}">
+                <button class="add-url-btn" type="button" onclick="addUrlInput()">Add URL</button>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button type="submit" class="save-button">Save</button>
+                <button type="button" class="cancel-button" onclick="cancelChanges()">Cancel</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        function addUrlInput() {
+            const container = document.querySelector('.url-inputs');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = 'extra_urls';
+            input.placeholder = 'https://';
+            container.insertBefore(input, container.querySelector('.add-url-btn'));
+        }
+
+        function previewProfilePic(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('profile-pic-preview').src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                document.getElementById('profile-pic-preview').src = "{{ url_for('static', filename='uploads/' + session.get('profile_picture', 'default.jpg')) }}";
+            }
+        }
+
+       // Revert all fields to the session values or original ones
+    function cancelChanges() {
+        document.getElementById('bio').value = "{{ session.get('bio', '') }}";  // Use double quotes
+        document.getElementById('username').value = "{{ session['username'] }}";  // Use double quotes
+        document.getElementById('email').value = "{{ session['email'] }}";  // Use double quotes
+        document.getElementById('profile-pic-preview').src = "{{ url_for('static', filename='uploads/' + session.get('profile_picture', 'default.jpg')) }}";  // Use double quotes
+}
+    </script>
+
+</body>
+</html>

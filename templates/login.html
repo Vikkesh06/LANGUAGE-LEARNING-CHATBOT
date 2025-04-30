@@ -12,10 +12,15 @@
             <h2>Welcome Back</h2>
             <form method="POST">
                 <div class="input-field">
-                    <input type="text" name="username" placeholder="Enter your username" required>
+                    <input type="text" name="email" placeholder="Enter your email" required>
                 </div>
                 <div class="input-field">
                     <input type="password" name="password" placeholder="Enter your password" required>
+                </div>
+                <!-- Security Question Section -->
+                <div class="input-field">
+                    <label for="security-question">What is your pet's name?</label>
+                    <input type="text" name="security_answer" placeholder="Answer" required>
                 </div>
                 <button type="submit">Login</button>
             </form>
@@ -24,5 +29,3 @@
     </div>
 </body>
 </html>
-
-
