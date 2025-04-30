@@ -1,27 +1,30 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_mail import Mail, Message
 import secrets
 import os
 from werkzeug.utils import secure_filename
 import random
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
-app = Flask(__name__)  
+app = Flask(_name_)  
 app.secret_key = 'supersecretkey'  # Needed for session handling
+
+# --- Flask-Mail Setup ---
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'  
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = 'your-email@gmail.com'  # Your email address
+app.config['MAIL_PASSWORD'] = 'your-email-password'  # Your email password
+app.config['MAIL_DEFAULT_SENDER'] = 'your-email@gmail.com'
 
 # --- File Upload Setup ---
 UPLOAD_FOLDER = 'static/uploads/'  # Folder where profile pictures will be saved
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
-# --- SMTP Configuration ---
-smtp_server = "smtp.sendgrid.net"
-smtp_port = 465  # For SSL connection
-smtp_user = "apikey"  # Use 'apikey' as the username
-smtp_password = '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'  # SendGrid API key as the password
+mail = Mail(app)
 
 # --- Database Functions ---
 def get_db_connection():
@@ -56,36 +59,6 @@ def register_user(username, email, password, security_answer):
     except sqlite3.IntegrityError:
         return False
 
-# --- OTP Functions ---
-def generate_otp():
-    return str(random.randint(100000, 999999))  # 6-digit OTP
-
-def send_otp(email, otp):
-    try:
-        # Create the email content
-        from_email = "kishenkish18@gmail.com"  # SendGrid verified sender email
-        subject = "Your One-Time Password (OTP)"
-        body = f"Your OTP is: {otp}"
-        
-        msg = MIMEMultipart()
-        msg['From'] = from_email
-        msg['To'] = email
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
-        
-        # Send the email via SMTP server
-        server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-        server.login(smtp_user, smtp_password)
-        server.sendmail(from_email, email, msg.as_string())
-        server.quit()
-
-        # Debugging response log
-        print(f"OTP sent to {email}")
-        print(f"OTP: {otp}")
-    except Exception as e:
-        print(f"Error sending email: {e}")
-        flash('Error in sending OTP. Please try again.')
-
 # --- Routes ---
 @app.route('/')
 def index():
@@ -103,29 +76,10 @@ def login():
         if user:
             session['username'] = user['username']
             session['email'] = email
-
-            # Generate OTP and send via email
-            otp = generate_otp()
-            session['otp'] = otp
-            send_otp(email, otp)
-
-            return redirect(url_for('verify_otp'))
-
+            return redirect(url_for('dashboard'))
         else:
             error = "❌ Invalid email, password, or security answer."
     return render_template('login.html', error=error)
-
-@app.route('/verify_otp', methods=['GET', 'POST'])
-def verify_otp():
-    error = None
-    if request.method == 'POST':
-        otp_entered = request.form['otp']
-        if otp_entered == session.get('otp'):
-            return redirect(url_for('dashboard'))
-        else:
-            error = "❌ Invalid OTP."
-
-    return render_template('verify_otp.html', error=error)
 
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
@@ -137,25 +91,9 @@ def forgot_password():
             
             if user:
                 reset_token = secrets.token_urlsafe(16)
-                # Store the reset token in the database
-                with get_db_connection() as conn:
-                    conn.execute("UPDATE users SET reset_token = ? WHERE email = ?", (reset_token, email))
-                    conn.commit()
-
-                # Construct the reset email
-                msg = MIMEMultipart()
-                msg['From'] = "kishenkish18@gmail.com"
-                msg['To'] = email
-                msg['Subject'] = 'Password Reset Request'
-                body = f"Click here to reset your password: http://localhost:5000/reset_password/{reset_token}"
-                msg.attach(MIMEText(body, 'plain'))
-                
-                # Send reset email
-                server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-                server.login(smtp_user, smtp_password)
-                server.sendmail("kishenkish18@gmail.com", email, msg.as_string())
-                server.quit()
-                
+                msg = Message('Password Reset Request', recipients=[email])
+                msg.body = f"Click here to reset your password: http://localhost:5000/reset_password/{reset_token}"
+                mail.send(msg)
                 flash('Check your email for the password reset link.')
                 return redirect(url_for('login'))
             else:
@@ -170,8 +108,7 @@ def reset_password(reset_token):
 
         # Update the password in the database for the user with the corresponding reset token
         with get_db_connection() as conn:
-            conn.execute("UPDATE users SET password = ?, reset_token = NULL WHERE reset_token = ?", 
-                         (hashed_password, reset_token))
+            conn.execute("UPDATE users SET password = ? WHERE reset_token = ?", (hashed_password, reset_token))
             conn.commit()
 
         flash("Your password has been successfully updated.")
@@ -205,7 +142,6 @@ def dashboard():
 def logout():
     session.pop('username', None)
     session.pop('email', None)
-    session.pop('otp', None)
     return redirect(url_for('login'))
 
 # --- Admin Routes ---
@@ -334,5 +270,5 @@ def allowed_file(filename):
     allowed_extensions = {'png', 'jpg', 'jpeg', 'gif'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
-if __name__ == '__main__':
+if _name_ == '_main_':
     app.run(debug=True)
