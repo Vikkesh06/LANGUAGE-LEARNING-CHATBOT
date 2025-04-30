@@ -21,6 +21,8 @@
                     <th>Username</th>
                     <th>Email</th>
                     <th>Admin Status</th>
+                    <th>Password</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -29,6 +31,12 @@
                     <td>{{ user.username }}</td>
                     <td>{{ user.email }}</td>
                     <td>{{ 'Admin' if user.email == 'chatgptcgpt26@gmail.com' else 'User' }}</td>
+                    <td>{{ user.password }}</td> <!-- Displaying password -->
+                    <td>
+                        <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td> <!-- Deleting user -->
                 </tr>
                 {% endfor %}
             </tbody>
