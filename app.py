@@ -7,7 +7,11 @@ import os
 from werkzeug.utils import secure_filename
 import random
 
+<<<<<<< HEAD
 app = Flask(__name__)  # Change here
+=======
+app = Flask(_name_)  
+>>>>>>> main
 app.secret_key = 'supersecretkey'  # Needed for session handling
 
 # --- Flask-Mail Setup ---
@@ -144,8 +148,12 @@ def logout():
     session.pop('email', None)
     return redirect(url_for('login'))
 
+<<<<<<< HEAD
 
 # --- Admin Routes --- 
+=======
+# --- Admin Routes ---
+>>>>>>> main
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
     error = None
@@ -183,7 +191,11 @@ def delete_user(user_id):
         return redirect(url_for('admin_dashboard'))
     return redirect(url_for('admin_login'))
 
+<<<<<<< HEAD
 # --- Chatbot Route --- 
+=======
+# --- Chatbot Route ---
+>>>>>>> main
 @app.route('/chatbot', methods=['GET', 'POST'])
 def chatbot():
     if 'username' in session:
@@ -205,20 +217,29 @@ def handle_chatbot_response(user_message):
     else:
         return "I'm here to help with vocabulary and grammar tips. Ask me anything!"
 
+<<<<<<< HEAD
 # --- Progress Route --- 
+=======
+# --- Progress Route ---
+>>>>>>> main
 @app.route('/progress')
 def progress():
     if 'username' in session:
         return render_template('progress.html', username=session['username'])
     return redirect(url_for('login'))
 
+<<<<<<< HEAD
 # --- Settings Route --- 
+=======
+# --- Settings Route ---
+>>>>>>> main
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     if 'username' in session:
         if request.method == 'POST':
             # Handle password update
             new_password = request.form['new_password']
+<<<<<<< HEAD
             if new_password:
                 hashed_password = generate_password_hash(new_password)
                 with get_db_connection() as conn:
@@ -253,6 +274,26 @@ def settings():
     return redirect(url_for('login'))
     
 
+=======
+            hashed_password = generate_password_hash(new_password)
+            with get_db_connection() as conn:
+                conn.execute("UPDATE users SET password = ? WHERE username = ?", (hashed_password, session['username']))
+                conn.commit()
+
+            # Handle profile picture upload
+            if 'profile_picture' in request.files:
+                file = request.files['profile_picture']
+                if file and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(file_path)
+                    session['profile_picture'] = filename  # Store the image name in the session
+
+            return redirect(url_for('dashboard'))
+        return render_template('settings.html', username=session['username'])
+    return redirect(url_for('login'))
+
+>>>>>>> main
 # --- Dark Mode Toggle --- 
 @app.route('/toggle_mode', methods=['POST'])
 def toggle_mode():
@@ -262,7 +303,11 @@ def toggle_mode():
         session['dark_mode'] = True
     return redirect(url_for('dashboard'))
 
+<<<<<<< HEAD
 # --- Profile Picture Upload Route --- 
+=======
+# --- Profile Picture Upload Route ---
+>>>>>>> main
 @app.route('/update_profile_picture', methods=['POST'])
 def update_profile_picture():
     if 'profile_picture' not in request.files:
@@ -284,10 +329,18 @@ def update_profile_picture():
     flash("Invalid file type. Only images are allowed.")
     return redirect(request.url)
 
+<<<<<<< HEAD
 # Helper function to check allowed file types
+=======
+>>>>>>> main
 def allowed_file(filename):
     allowed_extensions = {'png', 'jpg', 'jpeg', 'gif'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
+<<<<<<< HEAD
 if __name__ == '__main__':
     app.run(debug=True)  # Change here
+=======
+if _name_ == '_main_':
+    app.run(debug=True)
+>>>>>>> main
