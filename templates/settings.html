@@ -173,6 +173,25 @@
         .input-field {
             margin-bottom: 20px;
         }
+<<<<<<< HEAD
+
+        /* Success message */
+        .success-message {
+            color: green;
+            font-size: 16px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        /* Error message */
+        .error-message {
+            color: red;
+            font-size: 16px;
+            margin-top: 20px;
+            text-align: center;
+        }
+=======
+>>>>>>> main
     </style>
 </head>
 <body>
@@ -180,7 +199,15 @@
     <div class="settings-container">
         <h2>Settings</h2>
 
+<<<<<<< HEAD
+        {% if message %}
+        <div class="{{ message_type }}">{{ message }}</div>
+        {% endif %}
+
+        <form id="settings-form" method="POST" enctype="multipart/form-data">
+=======
         <form method="POST" enctype="multipart/form-data">
+>>>>>>> main
             <div class="section-title">Profile</div>
 
             <div class="profile-picture-container">
@@ -198,7 +225,11 @@
                 <select id="email" name="email">
                     <option value="">Select a verified email to display</option>
                     {% for email in verified_emails %}
+<<<<<<< HEAD
+                        <option value="{{ email }}" {% if session['email'] == email %}selected{% endif %}>{{ email }}</option>
+=======
                     <option value="{{ email }}" {% if session['email'] == email %}selected{% endif %}>{{ email }}</option>
+>>>>>>> main
                     {% endfor %}
                 </select>
             </div>
@@ -222,7 +253,15 @@
                 <button class="add-url-btn" type="button" onclick="addUrlInput()">Add URL</button>
             </div>
 
+<<<<<<< HEAD
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button type="submit" class="save-button">Save</button>
+                <button type="button" class="cancel-button" onclick="cancelChanges()">Cancel</button>
+            </div>
+=======
             <button type="submit">Update Profile</button>
+>>>>>>> main
         </form>
     </div>
 
@@ -247,7 +286,22 @@
                 document.getElementById('profile-pic-preview').src = "{{ url_for('static', filename='uploads/' + session.get('profile_picture', 'default.jpg')) }}";
             }
         }
+<<<<<<< HEAD
+
+       // Revert all fields to the session values or original ones
+    function cancelChanges() {
+        document.getElementById('bio').value = "{{ session.get('bio', '') }}";  // Use double quotes
+        document.getElementById('username').value = "{{ session['username'] }}";  // Use double quotes
+        document.getElementById('email').value = "{{ session['email'] }}";  // Use double quotes
+        document.getElementById('profile-pic-preview').src = "{{ url_for('static', filename='uploads/' + session.get('profile_picture', 'default.jpg')) }}";  // Use double quotes
+}
     </script>
 
 </body>
 </html>
+=======
+    </script>
+
+</body>
+</html>
+>>>>>>> main
