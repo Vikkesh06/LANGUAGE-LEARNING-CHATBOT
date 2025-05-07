@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .results-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .score {
+            font-size: 24px;
+            margin: 20px 0;
+        }
+        .percentage {
+            font-size: 32px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 20px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="quiz-results">
+        <h2>Quiz Results</h2>
+        <div class="score-summary">
+            <p>You scored {{ score }} out of {{ total }} ({{ (score/total*100)|round|int }}%)</p>
+        </div>
+        
+        <div class="answer-details">
+            {% for result in results %}
+            <div class="question-result {% if result.is_correct %}correct{% else %}incorrect{% endif %}">
+                <h3>Question {{ loop.index }}: {{ result.question }}</h3>
+                <p>Your answer: {{ result.user_answer or "Not answered" }}</p>
+                <p>Correct answer: {{ result.correct_answer }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <a href="{{ url_for('quiz') }}" class="btn">Take Another Quiz</a>
+    </div>
+</body>
+</html>

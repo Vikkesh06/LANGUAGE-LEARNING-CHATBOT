@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ language }} Quiz ({{ difficulty|capitalize }})</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .quiz-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .question-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        .question-card.unanswered {
+            border-left: 4px solid #ff4444;
+            background-color: #fff8f8;
+        }
+        .options {
+            margin-top: 15px;
+        }
+        .option {
+            display: block;
+            padding: 12px 15px;
+            margin: 8px 0;
+            background: #e9ecef;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .option:hover {
+            background: #dee2e6;
+            transform: translateX(5px);
+        }
+        .option input[type="radio"] {
+            margin-right: 10px;
+        }
+        .submit-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            display: block;
+            width: 200px;
+            margin: 30px auto 0;
+            transition: all 0.3s ease;
+        }
+        .submit-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .submit-btn:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <h1>{{ language }} Quiz ({{ difficulty|capitalize }})</h1>
+        
+        <form id="quizForm" action="{{ url_for('submit_quiz') }}" method="post">
+            <input type="hidden" name="language" value="{{ language }}">
+            <input type="hidden" name="difficulty" value="{{ difficulty }}">
+            
+            {% for question in questions %}
+            <div class="question-card" id="question-{{ question.number }}">
+                <h3>Question {{ question.number }}: {{ question.text }}</h3>
+                <div class="options">
+                    {% for option in question.options %}
+                    <label class="option">
+                        <input type="radio" name="q_{{ question.number }}" value="{{ option }}" required>
+                        {{ option }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            
+            <button type="submit" class="submit-btn" id="submitBtn" disabled>Submit Quiz</button>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const questionCards = document.querySelectorAll('.question-card');
+            const submitBtn = document.getElementById('submitBtn');
+            const form = document.getElementById('quizForm');
+            
+            // Function to check if all questions are answered
+            function checkAllQuestionsAnswered() {
+                const allQuestions = document.querySelectorAll('.question-card');
+                let allAnswered = true;
+                
+                allQuestions.forEach(questionCard => {
+                    const questionNumber = questionCard.id.split('-')[1];
+                    const answered = document.querySelector(`input[name="q_${questionNumber}"]:checked`);
+                    
+                    if (!answered) {
+                        allAnswered = false;
+                    }
+                });
+                
+                submitBtn.disabled = !allAnswered;
+                return allAnswered;
+            }
+            
+            // Add change event listeners to all radio buttons
+            document.querySelectorAll('input[type="radio"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const questionNumber = this.name.split('_')[1];
+                    const questionCard = document.getElementById(`question-${questionNumber}`);
+                    
+                    // Remove unanswered class when an option is selected
+                    questionCard.classList.remove('unanswered');
+                    
+                    // Check if all questions are answered
+                    checkAllQuestionsAnswered();
+                });
+            });
+            
+            // Form submission handler
+            form.addEventListener('submit', function(e) {
+                if (!checkAllQuestionsAnswered()) {
+                    e.preventDefault();
+                    
+                    // Highlight unanswered questions
+                    document.querySelectorAll('.question-card').forEach(questionCard => {
+                        const questionNumber = questionCard.id.split('-')[1];
+                        if (!document.querySelector(`input[name="q_${questionNumber}"]:checked`)) {
+                            questionCard.classList.add('unanswered');
+                        }
+                    });
+                    
+                    // Scroll to first unanswered question
+                    const firstUnanswered = document.querySelector('.unanswered');
+                    if (firstUnanswered) {
+                        window.scrollTo({
+                            top: firstUnanswered.offsetTop - 20,
+                            behavior: 'smooth'
+                        });
+                    }
+                    
+                    alert('Please answer all questions before submitting.');
+                }
+            });
+            
+            // Initial check on page load
+            checkAllQuestionsAnswered();
+        });
+    </script>
+</body>
+</html>

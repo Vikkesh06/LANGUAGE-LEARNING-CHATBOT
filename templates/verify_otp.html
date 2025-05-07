@@ -9,14 +9,29 @@
 <body>
     <div class="form-container">
         <h2>Enter OTP</h2>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <p style="color: green;">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
         {% if error %}
             <p style="color: red;">{{ error }}</p>
         {% endif %}
+
         <form method="POST">
             <label for="otp">Enter OTP:</label>
             <input type="text" id="otp" name="otp" required>
             <button type="submit">Verify OTP</button>
         </form>
+
+        <div class="otp-actions">
+            <p>Didn't receive the OTP?</p>
+            <a href="{{ url_for('resend_otp') }}">Resend OTP</a>
+        </div>
     </div>
 </body>
 </html>

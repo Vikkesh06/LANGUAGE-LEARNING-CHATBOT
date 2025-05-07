@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz | Language Chatbot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .quiz-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .difficulty-levels {
+            display: flex;
+            justify-content: space-between;
+            margin: 30px 0;
+        }
+        .level-card {
+            width: 30%;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .level-card:hover {
+            transform: translateY(-5px);
+        }
+        .beginner {
+            background-color: #e3f2fd;
+            border: 2px solid #64b5f6;
+        }
+        .intermediate {
+            background-color: #fff8e1;
+            border: 2px solid #ffd54f;
+        }
+        .advanced {
+            background-color: #ffebee;
+            border: 2px solid #e57373;
+        }
+        .language-selector {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+        }
+        select {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .home-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: #4285f4;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .home-btn:hover {
+            background: #3367d6;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <a href="{{ url_for('dashboard') }}" class="home-btn">Home</a>
+    
+    <div class="quiz-container">
+        <h1>Language Quiz</h1>
+        
+        <div class="language-selector">
+            <label for="language">Choose a language:</label>
+            <select id="language" name="language">
+                {% for language in languages %}
+                <option value="{{ language }}">{{ language }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <h2>Select Difficulty Level</h2>
+        
+        <div class="difficulty-levels">
+            <div class="level-card beginner" onclick="startQuiz('beginner')">
+                <h3>Beginner</h3>
+                <p>Basic vocabulary and simple sentences</p>
+            </div>
+            
+            <div class="level-card intermediate" onclick="startQuiz('intermediate')">
+                <h3>Intermediate</h3>
+                <p>Common phrases and grammar concepts</p>
+            </div>
+            
+            <div class="level-card advanced" onclick="startQuiz('advanced')">
+                <h3>Advanced</h3>
+                <p>Complex sentences and idioms</p>
+            </div>
+        </div>
+    </div>
+    
+
+    <script>
+        function startQuiz(difficulty) {
+            const language = document.getElementById('language').value;
+            window.location.href = `/quiz/${difficulty}?language=${encodeURIComponent(language)}`;
+        }
+    </script>
+</body>
+</html>
