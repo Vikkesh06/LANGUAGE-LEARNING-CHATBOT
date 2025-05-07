@@ -3,96 +3,257 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Progress | Language Chatbot</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Language Learning Progress</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Background with gradient */
         body {
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            color: #fff;
+            font-family: 'Inter', sans-serif;
         }
-
-        /* Form container styling */
-        .form-container {
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 40px;
-            border-radius: 15px;
-            width: 100%;
-            max-width: 600px;
-            text-align: center;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        h2 {
-            font-size: 30px;
-            margin-bottom: 20px;
-            color: #ff6347;
-        }
-
-        p {
-            font-size: 18px;
-            margin-bottom: 30px;
-            color: #ffd700;
-        }
-
-        /* Progress bar container */
-        .progress-container {
-            width: 100%;
-            background-color: #f0f0f0;
-            border-radius: 50px;
-            height: 30px;
-            margin-bottom: 30px;
+        .progress-bar-container {
+            background-color: #e5e7eb;
+            border-radius: 1rem;
+            height: 0.5rem;
+            margin-bottom: 1rem;
+            position: relative;
             overflow: hidden;
         }
-
-        /* Progress bar styling */
         .progress-bar {
-            width: 60%; /* Adjust this to simulate progress */
-            height: 100%;
-            background-color: #4caf50;
-            border-radius: 50px;
-            transition: width 1s ease-in-out;
+            background-image: linear-gradient(to right, #4f46e5, #6366f1);
+            border-radius: 1rem;
+            height: 0.5rem;
+            width: 0%;
+            transition: width 0.5s ease-in-out;
+            position: relative;
         }
-
-        /* Button link styling */
-        .logout-link {
-            display: inline-block;
-            margin-top: 20px;
-            color: #0366d6;
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: 0;
+            transform: translateY(-50%);
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            background-image: linear-gradient(to right, #4f46e5, #6366f1);
+        }
+        .quiz-status-container {
+            margin-bottom: 1rem;
+        }
+        .quiz-status {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            text-align: center;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        .quiz-status span {
+            background-color: #f3f4f6;
+            border-radius: 0.375rem;
+            padding: 0.25rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+        }
+        .quiz-status span span {
+            font-weight: 500;
+        }
+        .tick {
+            display: none;
+            font-size: 1rem;
+            color: #16a34a;
+        }
+        .login-streak-container {
+            margin-bottom: 1rem;
+        }
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .app-button {
+            font-weight: 600;
+            border-radius: 0.375rem;
+            padding: 0.75rem 0;
+            width: 100%;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-image 0.3s;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .app-button:hover {
+            transform: translateY(-0.125rem) scale(1.05);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .primary-button {
+            background-image: linear-gradient(to right, #10b981, #3b82f6);
+            color: white;
+        }
+        .primary-button:hover {
+            background-image: linear-gradient(to right, #15803d, #2563eb);
+        }
+        .secondary-button {
+            background-image: linear-gradient(to right, #8b5cf6, #d946ef);
+            color: white;
+        }
+        .secondary-button:hover {
+            background-image: linear-gradient(to right, #7c3aed, #c026d3);
+        }
+        .danger-button {
+            background-image: linear-gradient(to right, #ef4444, #f59e0b);
+            color: white;
+        }
+        .danger-button:hover {
+            background-image: linear-gradient(to right, #dc2626, #d97706);
+        }
+        .app-button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+            opacity: 0.7;
+            transform: none;
+            box-shadow: none;
+        }
+        #message-box {
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 1rem;
+            color: #4b5563;
+            font-weight: 500;
+            min-height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .dashboard-link {
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+        .dashboard-button {
+            font-weight: 600;
+            border-radius: 0.375rem;
+            padding: 0.75rem 0;
+            width: 100%;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-image 0.3s;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-image: linear-gradient(to right, #4a5568, #2d3748);
+            color: white;
             text-decoration: none;
-            font-size: 16px;
-            padding: 12px 20px;
-            border-radius: 6px;
-            background-color: #fff;
-            border: 1px solid #0366d6;
-            transition: all 0.3s ease;
         }
-
-        .logout-link:hover {
-            background-color: #0366d6;
-            color: #fff;
+        .dashboard-button:hover {
+            background-image: linear-gradient(to right, #718096, #4a5568);
+            transform: translateY(-0.125rem) scale(1.05);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
-<body>
-
-    <div class="form-container">
-        <h2>Your Progress</h2>
-        <p>Your progress details will appear here!</p>
-
-        <!-- Progress Bar -->
-        <div class="progress-container">
-            <div class="progress-bar"></div>
+<body class="bg-gradient-to-r from-blue-100 to-purple-100 flex justify-center items-center min-h-screen p-4">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md transition-transform hover:scale-105">
+        <h1 class="text-2xl font-semibold text-indigo-600 text-center mb-4">Your Learning Progress</h1>
+        <div class="progress-bar-container">
+            <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
         </div>
-
-        <a href="{{ url_for('dashboard') }}" class="logout-link">Back to Dashboard</a>
+        <p id="progress-text" class="text-right text-indigo-500 font-medium mb-4">0%</p>
+        <div class="mb-4">
+            <p class="text-gray-700 text-sm">Current Lesson: <span id="current-lesson" class="font-medium text-blue-600">1</span> / <span id="total-lessons" class="font-medium text-purple-600">6</span></p>
+        </div>
+        <div class="quiz-status-container">
+            <p class="text-gray-700 text-sm mb-2">Quiz Status:</p>
+            <div id="quiz-status" class="quiz-status">
+                {% for lang in ['English', 'Chinese', 'Malay', 'Spanish', 'French', 'Portuguese'] %}
+                <span>{{ lang }}: <span id="quiz-{{ lang|lower }}" class="font-medium text-gray-500">Not Taken</span> <span id="tick-{{ lang|lower }}" class="tick">✅</span></span>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="login-streak-container">
+            <p class="text-gray-700 text-sm">Login Streak: <span id="login-streak" class="font-medium text-blue-600">0</span> Days</p>
+        </div>
+        <div class="button-container">
+            <button id="mark-as-complete" class="app-button primary-button">
+                Mark Lesson as Complete
+            </button>
+            <button id="take-quiz" class="app-button secondary-button">
+                Take Quiz
+            </button>
+            <button id="reset-progress" class="app-button danger-button">
+                Reset Progress
+            </button>
+        </div>
+        <div id="message-box" class="mt-4">
+            Start your journey!
+        </div>
+        <div class="dashboard-link">
+            <a href="{{ url_for('dashboard') }}" class="dashboard-button">Back to Dashboard</a>
+        </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const userId = "{{ session.get('user_id', '') }}";
+            if (userId) {
+                fetchQuizProgress(userId);
+            }
+        });
+    
+        async function fetchQuizProgress(userId) {
+    try {
+        const response = await fetch(/get_quiz_progress/${userId});
+        const progressData = await response.json();
+        
+        const quizStatusMap = {
+            'english': document.getElementById('quiz-english'),
+            'chinese': document.getElementById('quiz-chinese'),
+            'malay': document.getElementById('quiz-malay'),
+            'spanish': document.getElementById('quiz-spanish'),
+            'french': document.getElementById('quiz-french'),
+            'portuguese': document.getElementById('quiz-portuguese')
+        };
 
+        let quizzesPassed = 0;
+        const totalQuizzes = Object.keys(quizStatusMap).length;
+
+        for (const lang in quizStatusMap) {
+            const langDisplay = quizStatusMap[lang];
+            const langProgress = progressData.find(p => p.language.toLowerCase() === lang);
+            
+            if (langProgress) {
+                langDisplay.textContent = Passed (${langProgress.score}/${langProgress.total});
+                langDisplay.classList.add('text-green-500');
+                langDisplay.classList.remove('text-gray-500');
+                document.getElementById(tick-${lang}).style.display = 'inline';
+                quizzesPassed += 1;
+            } else {
+                langDisplay.textContent = 'Not Taken';
+                langDisplay.classList.add('text-gray-500');
+                langDisplay.classList.remove('text-green-500');
+                document.getElementById(tick-${lang}).style.display = 'none';
+            }
+        }
+
+        // Update progress bar
+        const progressPercent = (quizzesPassed / totalQuizzes) * 100;
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+
+        progressBar.style.width = ${progressPercent}%;
+        progressBar.setAttribute('aria-valuenow', progressPercent.toFixed(0));
+        progressText.textContent = ${progressPercent.toFixed(0)}%;
+        
+    } catch (error) {
+        console.error('Error fetching quiz progress:', error);
+    }
+}
+
+    </script>    
 </body>
 </html>
