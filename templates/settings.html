@@ -8,19 +8,18 @@
     <style>
         /* Updated Background color and design for the page */
         body {
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); /* Smooth gradient */
-            background-size: cover; /* Ensures the background covers the whole page */
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            background-size: cover;
             margin: 0;
             padding: 0;
             display: flex;
-            justify-content: center; /* Center the content horizontally */
-            align-items: center; /* Center the content vertically */
+            justify-content: center;
+            align-items: center;
             min-height: 100vh;
             font-family: Arial, sans-serif;
-            position: relative; /* Allows absolute positioning of background elements */
+            position: relative;
         }
 
-        /* Adding a subtle abstract pattern to the background */
         body::before {
             content: '';
             position: absolute;
@@ -28,12 +27,11 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: url('https://www.toptal.com/designers/subtlepatterns/patterns/diagonal_stripes.png'); /* Subtle texture */
-            opacity: 0.05; /* Light opacity so it doesn’t overpower the content */
+            background: url('https://www.toptal.com/designers/subtlepatterns/patterns/diagonal_stripes.png');
+            opacity: 0.05;
             z-index: 0;
         }
 
-        /* Content container */
         .settings-container {
             background: #fff;
             border-radius: 10px;
@@ -41,16 +39,15 @@
             width: 100%;
             max-width: 700px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            z-index: 1; /* Makes sure the container is above the background */
+            z-index: 1;
         }
 
-        /* Styling for the header */
         .settings-container h2 {
             margin-bottom: 30px;
             font-size: 26px;
             color: #333;
             text-align: center;
-            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2); /* Adding subtle text shadow for better contrast */
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .section-title {
@@ -73,10 +70,9 @@
             border-radius: 6px;
             border: 1px solid #ccc;
             margin-bottom: 15px;
-            box-sizing: border-box; /* Ensure padding doesn't increase the overall width */
+            box-sizing: border-box;
         }
 
-        /* Font style and padding for bio textarea */
         #bio {
             font-family: 'Arial', sans-serif;
             font-size: 16px;
@@ -86,11 +82,11 @@
             margin-bottom: 20px;
             min-height: 120px;
             resize: vertical;
-            background-color: #f9f9f9; /* Lighter background for bio */
-            box-sizing: border-box; /* Ensure padding doesn't increase the overall width */
+            background-color: #f9f9f9;
+            box-sizing: border-box;
+            width: 100%;
         }
 
-        /* Add a subtle hover effect to the input fields */
         input[type="text"]:hover, input[type="email"]:hover, input[type="password"]:hover, textarea:hover, select:hover, input[type="file"]:hover {
             border-color: #6a11cb;
         }
@@ -111,47 +107,45 @@
             background-color: #444c56;
         }
 
-        /* Profile Picture Container */
         .profile-picture-container {
             text-align: center;
             margin-bottom: 20px;
             padding: 10px;
-            border: 3px solid #ccc; /* Changed to a subtle border color */
+            border: 3px solid #ccc;
             border-radius: 8px;
             display: inline-block;
-            width: 120px; /* Adjusted width */
-            height: 120px; /* Adjusted height */
-            background-color: #f3f3f3; /* Subtle background */
+            width: 120px;
+            height: 120px;
+            background-color: #f3f3f3;
         }
 
         .profile-picture-container img {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Ensures the image maintains its aspect ratio */
+            object-fit: cover;
             border-radius: 50%;
         }
 
         .profile-picture-container input[type="file"] {
             margin-top: 10px;
-            width: 100%; /* Make file input take full width of its container */
-            box-sizing: border-box; /* Ensure padding doesn't increase the overall width */
+            width: 100%;
+            box-sizing: border-box;
         }
 
-        /* URL Inputs Styling */
         .url-inputs input {
-            margin-bottom: 10px; /* Reduced bottom margin for better spacing */
-            box-sizing: border-box; /* Ensure padding doesn't increase the overall width */
+            margin-bottom: 10px;
+            box-sizing: border-box;
         }
 
         .url-inputs .add-url-btn {
-            margin-top: 10px; /* Added top margin for spacing */
+            margin-top: 10px;
             display: inline-block;
             color: #0366d6;
             background: none;
             border: none;
             font-size: 14px;
             cursor: pointer;
-            padding: 0; /* Remove default button padding */
+            padding: 0;
         }
 
         .url-inputs .add-url-btn:hover {
@@ -163,80 +157,90 @@
             flex-direction: column;
         }
 
-        /* Ensure the form takes full width within its container */
         .settings-container form {
             display: flex;
             flex-direction: column;
         }
 
-        /* Improve spacing for input fields and sections */
         .input-field {
             margin-bottom: 20px;
         }
-<<<<<<< HEAD
 
-        /* Success message */
-        .success-message {
-            color: green;
-            font-size: 16px;
-            margin-top: 20px;
-            text-align: center;
+        /* Flash message styling */
+        .flash-messages {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
         }
 
-        /* Error message */
-        .error-message {
-            color: red;
-            font-size: 16px;
-            margin-top: 20px;
-            text-align: center;
+        .flash-message {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            color: white;
+            animation: slideIn 0.5s, fadeOut 0.5s 2.5s forwards;
         }
-=======
->>>>>>> main
+
+        .flash-success {
+            background-color: #4CAF50;
+        }
+
+        .flash-error {
+            background-color: #f44336;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
     </style>
 </head>
 <body>
 
+    <!-- Flash messages container -->
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
     <div class="settings-container">
         <h2>Settings</h2>
 
-<<<<<<< HEAD
-        {% if message %}
-        <div class="{{ message_type }}">{{ message }}</div>
-        {% endif %}
-
-        <form id="settings-form" method="POST" enctype="multipart/form-data">
-=======
-        <form method="POST" enctype="multipart/form-data">
->>>>>>> main
+        <form method="POST" enctype="multipart/form-data" action="{{ url_for('settings') }}">
             <div class="section-title">Profile</div>
 
             <div class="profile-picture-container">
-                <img id="profile-pic-preview" src="{{ url_for('static', filename='uploads/' + session.get('profile_picture', 'default.jpg')) }}" alt="Profile Picture">
-                <input type="file" name="profile_picture" accept="image/*" onchange="previewProfilePic(this)">
+                {% if user.profile_picture %}
+                    <img id="profile-pic-preview" src="{{ url_for('static', filename='uploads/' + user.profile_picture) }}" alt="Profile Picture">
+                {% else %}
+                    <img id="profile-pic-preview" src="{{ url_for('static', filename='images/default-profile.png') }}" alt="Profile Picture">
+                {% endif %}
+                <input type="file" id="profile_picture" name="profile_picture" accept="image/*" onchange="previewProfilePic(this)">
             </div>
 
             <div class="input-field">
                 <label for="username">Username</label>
-                <input type="text" id="username" name="username" placeholder="Name" value="{{ session['username'] }}" required>
+                <input type="text" id="username" name="username" placeholder="Name" value="{{ user.username }}" required readonly>
             </div>
 
             <div class="input-field">
                 <label for="email">Email</label>
-                <select id="email" name="email">
-                    <option value="">Select a verified email to display</option>
-                    {% for email in verified_emails %}
-<<<<<<< HEAD
-                        <option value="{{ email }}" {% if session['email'] == email %}selected{% endif %}>{{ email }}</option>
-=======
-                    <option value="{{ email }}" {% if session['email'] == email %}selected{% endif %}>{{ email }}</option>
->>>>>>> main
-                    {% endfor %}
-                </select>
+                <input type="email" id="email" name="email" placeholder="Your email" value="{{ user.email }}" required>
             </div>
 
             <div class="input-field">
                 <label for="bio">Bio</label>
-                <textarea id="bio" name="bio" placeholder="Tell us something about yourself">{{ session.get('bio', '') }}</textarea>
+                <textarea id="bio" name="bio" placeholder="Tell us something about yourself">{{ user.bio or '' }}</textarea>
             </div>
 
             <div class="section-title">Change Password (Optional)</div>
@@ -244,37 +248,39 @@
             <div class="input-field">
                 <label for="new_password">New Password</label>
                 <input type="password" id="new_password" name="new_password" placeholder="Enter new password">
+                <small>Leave blank to keep current password</small>
             </div>
 
             <div class="section-title">URLs</div>
             <div class="url-inputs">
-                <input type="text" name="url1" placeholder="https://example.com" value="{{ session.get('url1', '') }}">
-                <input type="text" name="url2" placeholder="http://twitter.com/yourhandle" value="{{ session.get('url2', '') }}">
-                <button class="add-url-btn" type="button" onclick="addUrlInput()">Add URL</button>
+                {% if user.urls %}
+                    {% set url_list = user.urls.split(',') %}
+                    {% for url in url_list %}
+                        <input type="text" name="urls" placeholder="https://example.com" value="{{ url }}">
+                    {% endfor %}
+                {% else %}
+                    <input type="text" name="urls" placeholder="https://example.com">
+                    <input type="text" name="urls" placeholder="http://twitter.com/yourhandle">
+                {% endif %}
+                <button class="add-url-btn" type="button" onclick="addUrlInput()">+ Add URL</button>
             </div>
 
-<<<<<<< HEAD
-            <!-- Action Buttons -->
-            <div class="action-buttons">
-                <button type="submit" class="save-button">Save</button>
-                <button type="button" class="cancel-button" onclick="cancelChanges()">Cancel</button>
-            </div>
-=======
             <button type="submit">Update Profile</button>
->>>>>>> main
         </form>
     </div>
 
     <script>
+        // Add new URL input field
         function addUrlInput() {
             const container = document.querySelector('.url-inputs');
             const input = document.createElement('input');
             input.type = 'text';
-            input.name = 'extra_urls';
+            input.name = 'urls';
             input.placeholder = 'https://';
             container.insertBefore(input, container.querySelector('.add-url-btn'));
         }
 
+        // Preview profile picture before upload
         function previewProfilePic(input) {
             if (input.files && input.files[0]) {
                 const reader = new FileReader();
@@ -282,26 +288,16 @@
                     document.getElementById('profile-pic-preview').src = e.target.result;
                 }
                 reader.readAsDataURL(input.files[0]);
-            } else {
-                document.getElementById('profile-pic-preview').src = "{{ url_for('static', filename='uploads/' + session.get('profile_picture', 'default.jpg')) }}";
             }
         }
-<<<<<<< HEAD
 
-       // Revert all fields to the session values or original ones
-    function cancelChanges() {
-        document.getElementById('bio').value = "{{ session.get('bio', '') }}";  // Use double quotes
-        document.getElementById('username').value = "{{ session['username'] }}";  // Use double quotes
-        document.getElementById('email').value = "{{ session['email'] }}";  // Use double quotes
-        document.getElementById('profile-pic-preview').src = "{{ url_for('static', filename='uploads/' + session.get('profile_picture', 'default.jpg')) }}";  // Use double quotes
-}
+        // Auto-hide flash messages after 3 seconds
+        setTimeout(() => {
+            const flashMessages = document.querySelectorAll('.flash-message');
+            flashMessages.forEach(msg => {
+                msg.style.display = 'none';
+            });
+        }, 3000);
     </script>
-
 </body>
 </html>
-=======
-    </script>
-
-</body>
-</html>
->>>>>>> main
