@@ -413,3 +413,349 @@ body.dark-mode button {
 button:hover {
   background-color: #FF4500;
 }
+
+/* Button styles */
+.submit-btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    display: block;
+    width: 200px;
+    margin: 30px auto 0;
+    transition: all 0.3s ease;
+}
+
+.active-btn {
+    background: #4CAF50;
+    color: white;
+}
+
+.active-btn:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.disabled-btn {
+    background: #cccccc;
+    color: #666666;
+    cursor: not-allowed;
+}
+
+.notification-dropdown {
+  position: absolute;
+  top: 55px;
+  left: 0;
+  background-color: #fff;
+  border-radius: 5px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  width: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+  display: none;
+  z-index: 1000;
+}
+
+.notification-item {
+  padding: 8px 12px;
+  transition: background-color 0.2s;
+}
+
+.notification-item:hover {
+  background-color: #f8f9fa;
+}
+
+.notification-message {
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.notification-timestamp {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.notification-header {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+.read-notification {
+  opacity: 0.7;
+  background-color: #f8f9fa;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #e64980;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ====================== */
+/* Achievements & Activity */
+/* ====================== */
+
+.achievements-section {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+body.dark-mode .achievements-section {
+  background: rgba(40, 40, 60, 0.9);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  color: #FFD77A;
+}
+
+.section-header i {
+  margin-right: 0.75rem;
+  font-size: 1.5rem;
+}
+
+/* Badges Grid */
+.badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.badge-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  text-align: center;
+  transition: transform 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.badge-card.earned {
+  background: rgba(108, 92, 231, 0.2);
+  border-color: rgba(108, 92, 231, 0.3);
+}
+
+.badge-card .badge-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: #FFD77A;
+}
+
+.badge-card.earned .badge-icon {
+  color: #6c5ce7;
+}
+
+.badge-card .badge-name {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.badge-card .badge-desc {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+/* Activity Feed */
+.activity-feed {
+  margin-top: 2rem;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background-color 0.3s ease;
+}
+
+.activity-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.quiz-score {
+  min-width: 60px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-right: 1rem;
+}
+
+.quiz-score.passed {
+  color: #4CAF50;
+}
+
+.quiz-score.failed {
+  color: #e64980;
+}
+
+.quiz-details {
+  flex: 1;
+}
+
+.quiz-title {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.quiz-date {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.quiz-points .points-badge {
+  background: rgba(108, 92, 231, 0.2);
+  color: #6c5ce7;
+  padding: 0.35rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.85rem;
+}
+
+/* Empty States */
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.empty-state i {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+/* Progress Milestones */
+.milestone-tracker {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  margin: 2rem 0;
+  padding: 0 1rem;
+}
+
+.milestone {
+  text-align: center;
+  z-index: 2;
+  position: relative;
+  flex: 1;
+}
+
+.milestone-icon {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 10px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 0.3s ease;
+}
+
+.milestone.achieved .milestone-icon {
+  background: #6c5ce7;
+  color: white;
+  box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.3);
+}
+
+.milestone.current .milestone-icon {
+  background: #FFD77A;
+  color: #1a1a1a;
+  animation: pulse 2s infinite;
+}
+
+.milestone-label {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.milestone-points {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.progress-connector {
+  position: absolute;
+  top: 25px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  z-index: -1;
+}
+
+.milestone.achieved + .milestone .progress-connector,
+.milestone.current + .milestone .progress-connector {
+  background: linear-gradient(90deg, #6c5ce7, rgba(255, 255, 255, 0.1));
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .badges-grid {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+  
+  .milestone-tracker {
+      flex-wrap: wrap;
+      gap: 1rem;
+  }
+  
+  .milestone {
+      flex: 0 0 calc(50% - 0.5rem);
+  }
+  
+  .progress-connector {
+      display: none;
+  }
+}
+
+/* Base transition styles */
+body {
+  transition: all 0.4s ease;
+}
+
+/* Slider styles */
+.slider {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: #ccc;
+  border-radius: 50%;
+  transition: all 0.4s;
+  cursor: pointer;
+}
+
+/* Progress bar styles */
+.progress-bar {
+  background-color: #4caf50;
+  transition: width 0.6s ease;
+}
