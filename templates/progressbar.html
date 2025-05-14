@@ -610,6 +610,72 @@
         .progress-impact li {
             margin-bottom: 0.5rem;
         }
+
+        .journey-header {
+            color: #2c3e50;
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 0.5rem;
+        }
+
+        .total-header {
+            color: #2c3e50;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-width: 200px;
+            text-align: center;
+            margin: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .points-card {
+            border-top: 4px solid #3498db;
+        }
+
+        .quizzes-card {
+            border-top: 4px solid #2ecc71;
+        }
+
+        .stat-card h5 {
+            color: #34495e;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .progress-container {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 <body class="{{ 'dark-mode' if session.get('dark_mode') else '' }}">
@@ -624,24 +690,34 @@
 
         <!-- Overall Progress Summary -->
         <div class="progress-container">
-            <h3>Your Language Journey</h3>
-            <div class="d-flex justify-content-between mb-2">
-                <span>
-                    Total Points: <strong>{{ progress.total_points }}</strong>
-                    <i class="fas fa-info-circle tooltip-icon"
-                       title="Earn points by completing quizzes. {{ progress.POINTS_PER_CORRECT_ANSWER }} points per correct answer"></i>
-                </span>
-                <span>
-                    Quizzes Completed: <strong>{{ progress.total_quizzes }}</strong>
-                </span>
+            <h3 class="journey-header">Your Language Journey</h3>
+            
+            <!-- Total Points Section -->
+            <div class="mb-4">
+                <h4 class="total-header">Total Points: <strong>491</strong></h4>
+                <div class="d-flex flex-wrap justify-content-around">
+                    {% for language, data in progress.progress.items() %}
+                    <div class="stat-card points-card">
+                        <h5>{{ language }}</h5>
+                        <div class="stat-value">{{ data.total_points }}</div>
+                        <div class="stat-label">points</div>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
-            <div class="d-flex justify-content-between mb-1">
-                <span>Overall Progress: <strong>{{ (progress.total_points / 2000 * 100)|round|int }}%</strong></span>
-                <span>{{ progress.total_points }}/2000 pts (Mastery)</span>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-fill"
-                     data-width="{{ (progress.total_points / 2000 * 100)|round(2) if progress.total_points > 0 else 0 }}"></div>
+
+            <!-- Total Quizzes Section -->
+            <div>
+                <h4 class="total-header">Total Quizzes: <strong>{{ progress.total_quizzes }}</strong></h4>
+                <div class="d-flex flex-wrap justify-content-around">
+                    {% for language, data in progress.progress.items() %}
+                    <div class="stat-card quizzes-card">
+                        <h5>{{ language }}</h5>
+                        <div class="stat-value">{{ data.quizzes_taken }}</div>
+                        <div class="stat-label">quizzes</div>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
 
