@@ -13,10 +13,13 @@ def initialize_database():
     Initializes the SQLite database with all required tables.
     Creates default admin user if it doesn't exist.
     """
+    print("\n=== Initializing Database ===")
+    
     # Connect to the database (or create it if it doesn't exist)
     with sqlite3.connect('database.db') as conn:
         # Use Write-Ahead Logging for better concurrency and reliability
         conn.execute('PRAGMA journal_mode=WAL;')  # Helps reduce lock issues
+        print("✅ WAL mode enabled!")
 
         # --- Create Tables ---
 
@@ -36,6 +39,7 @@ def initialize_database():
                 dark_mode INTEGER DEFAULT 0            -- UI theme preference
             )
         ''')
+        print("✅ Table 'users' created/verified!")
 
         # Quiz results table - stores detailed quiz results with points tracking
         conn.execute('''
@@ -56,6 +60,22 @@ def initialize_database():
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
+        print("✅ Table 'quiz_results_enhanced' created/verified!")
+
+        # Legacy quiz results table (kept for backward compatibility)
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS quiz_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                language TEXT NOT NULL,
+                difficulty TEXT NOT NULL,
+                score INTEGER NOT NULL,
+                total INTEGER NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
+        print("✅ Table 'quiz_results' (legacy) created/verified!")
 
         # Badges table - tracks user achievements
         conn.execute('''
@@ -69,6 +89,7 @@ def initialize_database():
                 UNIQUE(user_id, language, badge_id)    -- Prevent duplicate badges
             )
         ''')
+        print("✅ Table 'user_badges' created/verified!")
 
         # Notifications table - stores user notifications
         conn.execute('''
@@ -81,26 +102,57 @@ def initialize_database():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         ''')
+        print("✅ Table 'notifications' created/verified!")
+
+        # Chat history table - stores user-chatbot interactions
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS chat_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                message TEXT NOT NULL,
+                response TEXT NOT NULL,
+                language TEXT NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        ''')
+        print("✅ Table 'chat_history' created/verified!")
+
+        # --- Ensure Required Columns Exist ---
+        # Check and add any missing columns to users table
+        for column, definition in [
+            ("bio", "TEXT"),
+            ("urls", "TEXT"),
+            ("dark_mode", "INTEGER DEFAULT 0")
+        ]:
+            try:
+                conn.execute(f'ALTER TABLE users ADD COLUMN {column} {definition};')
+                conn.commit()
+                print(f"✅ Column '{column}' added to users table!")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
+        # Ensure the 'is_read' column exists in notifications table
+        try:
+            conn.execute('ALTER TABLE notifications ADD COLUMN is_read INTEGER DEFAULT 0;')
+            conn.commit()
+            print("✅ Column 'is_read' added to notifications table!")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
         # --- Create Default Admin User ---
-        # Get admin credentials from environment variables or use defaults
-        admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
-        admin_email = os.environ.get('ADMIN_EMAIL', 'admin@example.com')
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'adminpassword')
-
         try:
-            # Create admin user with hashed password
-            hashed_password = generate_password_hash(admin_password)
+            admin_password = generate_password_hash('adminpassword')
             conn.execute(
                 "INSERT OR IGNORE INTO users (username, email, password, security_answer, is_admin) VALUES (?, ?, ?, ?, ?)",
-                (admin_username, admin_email, hashed_password, 'admin', 1)
+                ('admin', 'kishenkish18@gmail.com', admin_password, 'admin', 1)
             )
+            conn.commit()
+            print("✅ Admin user created/verified!")
         except Exception as e:
-            print(f"Error creating admin user: {e}")
+            print(f"⚠ Error creating admin user: {e}")
 
-        # Commit all changes
-        conn.commit()
-        print("✅ Database initialized successfully!")
+        print("\n✅ Database initialization completed successfully!")
 
 if __name__ == '__main__':
     initialize_database()

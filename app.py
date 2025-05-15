@@ -10,7 +10,7 @@ import smtplib
 import sqlite3
 import hashlib
 import uuid
-import time
+import traceback
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -19,26 +19,35 @@ from random import sample, shuffle
 
 # Third-party imports
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+import google.generativeai as genai
 
 # Initialize Flask application
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'  # Used for session encryption
+CORS(app)
+app.secret_key = 'supersecretkey'
 
 # --- File Upload Configuration ---
 UPLOAD_FOLDER = 'static/uploads/'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}  # Allowed file extensions for uploads
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 # --- SMTP Configuration for Email Notifications ---
 # These settings are used for sending OTP and password reset emails
-smtp_server = "smtp.gmail.com"
-smtp_port = 465
-smtp_user = "your-email@gmail.com"  # Replace with your email
-smtp_password = 'your-app-password'  # Replace with your app password
+USE_CONSOLE_OTP = False  # Set to False to send actual emails
 
-# AI-generated questions have been removed from this application
+# SMTP settings for Gmail
+smtp_server = "smtp.gmail.com"
+smtp_port = 587  # TLS port for Gmail
+smtp_user = "kishenkish18@gmail.com"  # Replace with your actual email
+smtp_password = "pxcu tasw ndev hnvf"  # Replace with your actual password
+
+# --- Google Gemini AI Configuration ---
+API_KEY = "AIzaSyC0M-x3-IiWaroDCwHo59vcF4GBWijhPC0"
+genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel('gemini-2.0-flash')
 
 # --- Level Requirements and Progression System ---
 # This dictionary defines the points needed to reach each level and the badges awarded
@@ -406,39 +415,81 @@ def send_otp(email, otp):
         otp (str): The OTP code to send
 
     Returns:
-        bool: True if the email was sent successfully, False otherwise
+        bool: True if the OTP was sent successfully, False otherwise
     """
+    # Always print to console for debugging purposes
+    print("\n" + "="*50)
+    print(f"DEBUG - OTP CODE FOR {email}: {otp}")
+    print("="*50 + "\n")
+
+    # If using console OTP, don't try to send email
+    if USE_CONSOLE_OTP:
+        flash(f"OTP sent to {email}. For testing, check the console output.", 'info')
+        return True
+
+    # Send via email
     try:
-        # Create email message
+        # Create email message with a professional format
         msg = MIMEMultipart()
         msg['From'] = smtp_user
         msg['To'] = email
-        msg['Subject'] = "Your Login OTP Code"
+        msg['Subject'] = "Your Verification Code"
 
-        # Email body with the OTP
+        # Email body with the OTP in a clear format
         body = f"""
-        Your OTP verification code is: {otp}
+Hello,
 
-        This code will expire in 10 minutes.
+Your verification code is: {otp}
 
-        If you did not request this code, please ignore this email.
+This code is valid for 10 minutes.
+
+If you did not request this code, please ignore this email.
+
+Best regards,
+Language Learning App Team
         """
         msg.attach(MIMEText(body, 'plain'))
 
-        # Send the email
-        server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, email, msg.as_string())
-        server.quit()
+        # Send the email with better error handling
+        server = None
+        try:
+            # Connect to the SMTP server
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.ehlo()  # Identify yourself to the server
 
-        # Notify the user
-        flash(f"OTP sent to {email}. Check your inbox (and spam folder).", 'info')
-        return True
+            # Enable TLS encryption
+            server.starttls()
+            server.ehlo()  # Re-identify yourself over TLS connection
+
+            # Login and send
+            server.login(smtp_user, smtp_password)
+            server.sendmail(smtp_user, email, msg.as_string())
+
+            # Notify the user
+            flash(f"Verification code sent to {email}. Please check your inbox and spam folder.", 'info')
+            return True
+
+        finally:
+            # Make sure to close the connection even if an error occurs
+            if server:
+                server.quit()
+
+    except smtplib.SMTPAuthenticationError:
+        # Specific error for authentication issues
+        print("SMTP Authentication Error: Invalid username or password")
+        flash('Email authentication failed. Please check your email settings.', 'error')
+        return False
+
+    except smtplib.SMTPException as e:
+        # General SMTP errors
+        print(f"SMTP Error: {str(e)}")
+        flash('Error sending verification code. Please try again later.', 'error')
+        return False
 
     except Exception as e:
-        # Log the error and notify the user
-        print(f"Error sending OTP: {str(e)}")
-        flash('Error sending OTP. Please try again or contact support.', 'error')
+        # Any other errors
+        print(f"Unexpected error sending OTP: {str(e)}")
+        flash('Error sending verification code. Please try again or contact support.', 'error')
         return False
 
 def add_notification(user_id, notification_message):
@@ -505,7 +556,12 @@ def login():
             # Generate and send OTP for two-factor authentication
             otp = generate_otp()
             session['otp'] = otp
-            send_otp(email, otp)
+
+            # Send OTP via email
+            if not send_otp(email, otp):
+                # If sending fails, show error and redirect back to login
+                flash("Failed to send verification code. Please try again.", "error")
+                return redirect(url_for('login'))
 
             return redirect(url_for('verify_otp'))
         else:
@@ -552,9 +608,11 @@ def resend_otp():
         otp = generate_otp()
         session['otp'] = otp
 
-        # Send the new OTP to the user's email
-        send_otp(session['email'], otp)
-        flash("A new OTP has been sent to your email.", 'info')
+        # Send OTP via email
+        if send_otp(session['email'], otp):
+            flash("A new verification code has been sent to your email.", 'info')
+        else:
+            flash("Failed to send verification code. Please try again.", 'error')
 
     return redirect(url_for('verify_otp'))
 
@@ -597,11 +655,23 @@ def forgot_password():
                 """
                 msg.attach(MIMEText(body, 'plain'))
 
-                # Send the email
-                server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-                server.login(smtp_user, smtp_password)
-                server.sendmail(smtp_user, email, msg.as_string())
-                server.quit()
+                # For testing, print the reset link to console instead of sending email
+                if USE_CONSOLE_OTP:
+                    print("\n" + "="*50)
+                    print(f"PASSWORD RESET LINK FOR {email}: {reset_link}")
+                    print("="*50 + "\n")
+                else:
+                    # Send the email
+                    try:
+                        server = smtplib.SMTP(smtp_server, smtp_port)
+                        server.starttls()
+                        server.login(smtp_user, smtp_password)
+                        server.sendmail(smtp_user, email, msg.as_string())
+                        server.quit()
+                    except Exception as e:
+                        print(f"Error sending password reset email: {str(e)}")
+                        flash("Error sending password reset email. Please try again later.", "error")
+                        return redirect(url_for('forgot_password'))
 
                 flash('Check your email for the password reset link.', 'info')
                 return redirect(url_for('login'))
@@ -1650,62 +1720,93 @@ def delete_user(user_id):
 @app.route('/chatbot', methods=['GET', 'POST'])
 def chatbot():
     """
-    Simple chatbot interface for language learning assistance.
-    Provides basic responses to common language learning questions.
+    Chatbot interface for language learning assistance.
+    GET: Displays the chatbot interface
+    POST: Handles chat messages and returns AI responses
     """
-    # Ensure user is logged in
     if 'username' not in session:
         return redirect(url_for('login'))
-
-    # Handle AJAX POST requests for chatbot responses
+    
+    # Get notification count for the navbar
+    with get_db_connection() as conn:
+        notification_count = conn.execute(
+            "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0",
+            (session['user_id'],)
+        ).fetchone()[0]
+    
     if request.method == 'POST':
-        user_message = request.form['user_message']
-        bot_response = handle_chatbot_response(user_message)
-        return jsonify({'bot_response': bot_response})
+        data = request.get_json()
+        message = data.get('message', '')
+        language = data.get('language', 'english')
+        
+        if not message:
+            return jsonify({'error': 'Message is required'}), 400
 
-    # Display chatbot interface for GET requests
-    return render_template('chatbot.html', username=session['username'])
+        prompt = f"""You are a language learning chatbot. Respond to the user in {language}. Keep responses concise.
+User: {message}
+Chatbot: """
+        response_text = get_gemini_response(prompt)
+        return jsonify({'response': response_text}), 200
+    
+    return render_template('chatbot.html', 
+                         username=session['username'],
+                         notification_count=notification_count)
 
-def handle_chatbot_response(user_message):
+def get_gemini_response(prompt):
     """
-    Generates responses to user messages in the chatbot.
-    This is a simple rule-based implementation that could be expanded
-    or replaced with a more sophisticated NLP model.
-
-    Args:
-        user_message (str): The user's message text
-
-    Returns:
-        str: The chatbot's response
+    Sends a prompt to the Gemini API and returns the response.
+    Handles errors robustly.
     """
-    # Convert to lowercase for case-insensitive matching
-    message = user_message.lower()
+    try:
+        # Create a new model instance for each request
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        # Set up the generation config
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 1,
+            "top_k": 32,
+            "max_output_tokens": 800,
+        }
 
-    # Greetings
-    if message in ["hello", "hi", "hey", "greetings", "good day"]:
-        return "Hello! How can I help you with your language learning today?"
-
-    # Grammar tips
-    elif "grammar" in message or message == "grammar tip":
-        tips = [
-            "In Spanish, adjectives usually come after the noun.",
-            "In French, adjectives generally agree in gender and number with the noun they modify.",
-            "In English, the order of adjectives is: opinion, size, age, shape, color, origin, material, purpose.",
-            "In Chinese, the word order is typically subject-verb-object, similar to English."
+        # Set up safety settings
+        safety_settings = [
+            {
+                "category": "HARM_CATEGORY_HARASSMENT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_HATE_SPEECH",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+            }
         ]
-        return random.choice(tips)
 
-    # Quiz help
-    elif "quiz" in message or message == "quiz help":
-        return "I can help you practice for quizzes! Ask me about vocabulary, grammar, or common phrases."
+        # Generate the response
+        response = model.generate_content(
+            prompt,
+            generation_config=generation_config,
+            safety_settings=safety_settings
+        )
 
-    # Vocabulary help
-    elif "vocabulary" in message or "words" in message:
-        return "To build vocabulary, try learning words in context rather than isolated lists. Reading and listening to native content helps a lot!"
+        # Check if we got a valid response
+        if response and hasattr(response, 'text'):
+            return response.text.strip()
+        else:
+            print("Empty or invalid response from Gemini API")
+            return "I apologize, but I couldn't generate a proper response. Please try again."
 
-    # Default response
-    else:
-        return "I'm here to help with vocabulary and grammar tips. Ask me about specific languages or learning techniques!"
+    except Exception as e:
+        print(f"Error in get_gemini_response: {str(e)}")
+        print(f"Full traceback: {traceback.format_exc()}")
+        return "I apologize, but there was an error processing your request. Please try again."
 
 if __name__ == '__main__':
     """
