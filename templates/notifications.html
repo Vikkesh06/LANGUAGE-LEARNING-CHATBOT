@@ -294,7 +294,7 @@
 
             markReadButtons.forEach(button => {
                 button.addEventListener('click', (event) => {
-                    const notificationId = event.target.getAttribute('data-notification-id');
+                    const notificationId = event.target.closest('.mark-read-button').getAttribute('data-notification-id');
                     markNotificationAsRead(notificationId);
                 });
             });
