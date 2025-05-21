@@ -24,6 +24,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import google.generativeai as genai
 
+# Define available languages based on quiz data
+AVAILABLE_LANGUAGES = [
+    'English', 'Spanish', 'Chinese', 'Malay',
+    'French', 'Portuguese', 'Tamil'
+]
+
 # Initialize Flask application
 app = Flask(__name__)
 CORS(app)
@@ -40,7 +46,7 @@ USE_CONSOLE_OTP = False  # Set to False to send actual emails
 
 # SMTP settings for Gmail
 smtp_server = "smtp.gmail.com"
-smtp_port = 587  # TLS port for Gmail
+smtp_port = 465  # SSL port for Gmail (changed from 587)
 smtp_user = "kishenkish18@gmail.com"  # Replace with your actual email
 smtp_password = "pxcu tasw ndev hnvf"  # Replace with your actual password
 
@@ -53,18 +59,30 @@ model = genai.GenerativeModel('gemini-2.0-flash')
 # This dictionary defines the points needed to reach each level and the badges awarded
 # The progression system motivates users to continue learning and tracks their achievements
 LEVEL_REQUIREMENTS = {
-    'beginner': {'points': 200, 'badges': ['basic_vocab', 'simple_sentences']},
-    'intermediate': {'points': 500, 'badges': ['grammar_fundamentals', 'common_phrases']},
-    'advanced': {'points': 1000, 'badges': ['complex_grammar', 'idioms']},
-    'fluent': {'points': 2000, 'badges': ['mastery']}
+    'beginner': {'points': 300, 'badges': ['basic_vocab', 'simple_sentences']},
+    'intermediate': {'points': 700, 'badges': ['grammar_fundamentals', 'common_phrases']},
+    'advanced': {'points': 1500, 'badges': ['complex_grammar', 'idioms']}
 }
 
 # --- Points System Configuration ---
 # These settings control how points are awarded during quizzes
-POINTS_PER_CORRECT_ANSWER = 10  # Base points for each correct answer
-STREAK_BONUS = 5                # Additional points for consecutive correct answers
-TIME_BONUS_MULTIPLIER = 0.2     # Percentage bonus for quick answers (20% of base points)
-MIN_TIME_FOR_BONUS = 10         # Maximum seconds to qualify for time bonus
+def get_points_per_correct_answer(level):
+    """Returns the base points for each correct answer based on level"""
+    if level == 'advanced':
+        return 5
+    elif level == 'intermediate':
+        return 3
+    else:  # beginner
+        return 1
+
+def get_perfect_score_bonus(level):
+    """Returns the bonus points for perfect score based on level"""
+    if level == 'advanced':
+        return 10
+    elif level == 'intermediate':
+        return 8
+    else:  # beginner
+        return 5
 
 # --- Database Functions ---
 # These functions handle database connections and common database operations
@@ -76,7 +94,10 @@ def get_db_connection():
     Returns:
         sqlite3.Connection: A configured database connection
     """
-    conn = sqlite3.connect('database.db')
+    # Get the absolute path to the database file
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
+    
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row  # This allows accessing columns by name
     conn.execute('PRAGMA busy_timeout = 30000')  # 30 second timeout to avoid locking issues
     return conn
@@ -209,6 +230,7 @@ def get_progress_data(user_id):
         # For new users with no quiz data, create default English language entry
         if not quizzes:
             progress['English'] = _create_default_language_progress('English')
+            total_points = 0  # Explicitly set total points to 0 for new users
 
         # Process each quiz result
         for quiz in quizzes:
@@ -268,9 +290,9 @@ def get_progress_data(user_id):
             'LEVEL_REQUIREMENTS': LEVEL_REQUIREMENTS,
             'total_points': total_points,
             'total_quizzes': total_quizzes,
-            'POINTS_PER_CORRECT_ANSWER': POINTS_PER_CORRECT_ANSWER,
-            'STREAK_BONUS': STREAK_BONUS,
-            'TIME_BONUS_MULTIPLIER': TIME_BONUS_MULTIPLIER
+            'POINTS_PER_CORRECT_ANSWER': get_points_per_correct_answer('beginner'),  # Default to beginner for new users
+            'STREAK_BONUS': 0,  # Initialize streak bonus to 0 for new users
+            'TIME_BONUS_MULTIPLIER': 0.2
         }
 
 def _create_default_language_progress(language):
@@ -288,8 +310,7 @@ def _create_default_language_progress(language):
         'levels': {
             'beginner': {'points_earned': 0, 'quizzes': 0},
             'intermediate': {'points_earned': 0, 'quizzes': 0},
-            'advanced': {'points_earned': 0, 'quizzes': 0},
-            'fluent': {'points_earned': 0, 'quizzes': 0}
+            'advanced': {'points_earned': 0, 'quizzes': 0}
         },
         'badges': [],
         'current_level': 'beginner',
@@ -309,31 +330,17 @@ def _calculate_level_progression(data, total_points):
         data (dict): The language progress data to update
         total_points (int): Total points earned for this language
     """
-    # Fluent level (highest)
-    if total_points >= LEVEL_REQUIREMENTS['fluent']['points']:
-        data['current_level'] = 'fluent'
+    # Advanced level
+    if total_points >= LEVEL_REQUIREMENTS['advanced']['points']:
+        data['current_level'] = 'advanced'
         data['next_level'] = None
         data['points_to_next'] = 0
         data['level_complete'] = True
-
-        # Distribute points across levels for display
-        data['levels']['beginner']['points_earned'] = LEVEL_REQUIREMENTS['beginner']['points']
-        data['levels']['intermediate']['points_earned'] = LEVEL_REQUIREMENTS['intermediate']['points'] - LEVEL_REQUIREMENTS['beginner']['points']
-        data['levels']['advanced']['points_earned'] = LEVEL_REQUIREMENTS['advanced']['points'] - LEVEL_REQUIREMENTS['intermediate']['points']
-        data['levels']['fluent']['points_earned'] = total_points - LEVEL_REQUIREMENTS['advanced']['points']
-
-    # Advanced level
-    elif total_points >= LEVEL_REQUIREMENTS['advanced']['points']:
-        data['current_level'] = 'advanced'
-        data['next_level'] = 'fluent'
-        data['points_to_next'] = max(0, LEVEL_REQUIREMENTS['fluent']['points'] - total_points)
-        data['level_complete'] = False
 
         # Distribute points across levels
         data['levels']['beginner']['points_earned'] = LEVEL_REQUIREMENTS['beginner']['points']
         data['levels']['intermediate']['points_earned'] = LEVEL_REQUIREMENTS['intermediate']['points'] - LEVEL_REQUIREMENTS['beginner']['points']
         data['levels']['advanced']['points_earned'] = total_points - LEVEL_REQUIREMENTS['intermediate']['points']
-        data['levels']['fluent']['points_earned'] = 0
 
     # Intermediate level
     elif total_points >= LEVEL_REQUIREMENTS['intermediate']['points']:
@@ -346,7 +353,6 @@ def _calculate_level_progression(data, total_points):
         data['levels']['beginner']['points_earned'] = LEVEL_REQUIREMENTS['beginner']['points']
         data['levels']['intermediate']['points_earned'] = total_points - LEVEL_REQUIREMENTS['beginner']['points']
         data['levels']['advanced']['points_earned'] = 0
-        data['levels']['fluent']['points_earned'] = 0
 
     # Beginner level (lowest)
     else:
@@ -359,7 +365,6 @@ def _calculate_level_progression(data, total_points):
         data['levels']['beginner']['points_earned'] = total_points
         data['levels']['intermediate']['points_earned'] = 0
         data['levels']['advanced']['points_earned'] = 0
-        data['levels']['fluent']['points_earned'] = 0
 
 def _award_badges(data, total_points):
     """
@@ -388,10 +393,6 @@ def _award_badges(data, total_points):
         data['badges'].append('complex_grammar')
     if data['levels']['advanced']['points_earned'] >= LEVEL_REQUIREMENTS['advanced']['points']:
         data['badges'].append('idioms')
-
-    # Mastery badge (fluent level)
-    if total_points >= LEVEL_REQUIREMENTS['fluent']['points']:
-        data['badges'].append('mastery')
 
     # Special streak badge for consistent performance
     if data['highest_streak'] >= 5:
@@ -453,14 +454,9 @@ Language Learning App Team
         # Send the email with better error handling
         server = None
         try:
-            # Connect to the SMTP server
-            server = smtplib.SMTP(smtp_server, smtp_port)
-            server.ehlo()  # Identify yourself to the server
-
-            # Enable TLS encryption
-            server.starttls()
-            server.ehlo()  # Re-identify yourself over TLS connection
-
+            # Connect to the SMTP server using SSL
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+            
             # Login and send
             server.login(smtp_user, smtp_password)
             server.sendmail(smtp_user, email, msg.as_string())
@@ -510,7 +506,7 @@ def add_notification(user_id, notification_message):
 
 # --- Import application modules ---
 # These imports are placed here to avoid circular imports
-from quiz_data import QUIZ_DATA  # Pre-defined quiz questions by language and difficulty
+from scripts.quiz_data import QUIZ_DATA  # Pre-defined quiz questions by language and difficulty
 
 # --- Application Routes ---
 # These functions handle HTTP requests and render the appropriate templates
@@ -795,7 +791,7 @@ def progress():
 def settings():
     """
     Handles user profile settings and updates.
-    Allows users to change their email, password, bio, and profile picture.
+    Allows users to change their profile information, password, preferences, and account status.
     """
     # Ensure user is logged in
     if 'username' not in session:
@@ -804,69 +800,166 @@ def settings():
     # Get current user data
     with get_db_connection() as conn:
         user = conn.execute("SELECT * FROM users WHERE username = ?", (session['username'],)).fetchone()
+    
+    # For avatar selection, get available avatars from static/avatars
+    avatars = []
+    avatars_dir = os.path.join('static', 'avatars')
+    if os.path.exists(avatars_dir):
+        avatars = [f for f in os.listdir(avatars_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))]
 
     # Handle form submission for profile updates
     if request.method == 'POST':
-        # Get form data
-        email = request.form.get('email')
-        bio = request.form.get('bio')
-        new_password = request.form.get('new_password')
-        urls = request.form.get('urls')
+        action = request.form.get('action', 'save_profile')
+        
+        # Profile update
+        if action == 'save_profile':
+            # Get form data
+            name = request.form.get('name')
+            email = request.form.get('email')
+            phone = request.form.get('phone')
+            location = request.form.get('location')
+            website = request.form.get('website')
+            bio = request.form.get('bio')
+            
+            # Process URLs
+            urls = []
+            for key, values in request.form.lists():
+                if key == 'urls':
+                    for value in values:
+                        if value and value.strip():
+                            urls.append(value.strip())
+            # Always set urls_str (could be empty string)
+            urls_str = '\n'.join(urls) if urls else ''
+            
+            # Avatar/profile picture handling
+            profile_pic_filename = None
+            selected_avatar = request.form.get('selected_avatar')
+            
+            if 'profile_picture' in request.files:
+                file = request.files['profile_picture']
+                if file and file.filename and allowed_file(file.filename):
+                    # Secure the filename and save the file
+                    filename = secure_filename(file.filename)
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(file_path)
+                    profile_pic_filename = filename
 
-        # Handle profile picture upload
-        profile_pic_filename = None
-        if 'profile_picture' in request.files:
-            file = request.files['profile_picture']
-            if file and file.filename and allowed_file(file.filename):
-                # Secure the filename and save the file
-                filename = secure_filename(file.filename)
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
-                profile_pic_filename = filename
+            try:
+                # Prepare update data
+                update_data = {}
+                
+                # Add all fields to update data if they have values
+                if name is not None:
+                    update_data['name'] = name
+                if email is not None:
+                    update_data['email'] = email
+                if phone is not None:
+                    update_data['phone'] = phone
+                if location is not None:
+                    update_data['location'] = location
+                if website is not None:
+                    update_data['website'] = website
+                if bio is not None:
+                    update_data['bio'] = bio
+                # Always include URLs to allow them to be cleared
+                update_data['urls'] = urls_str
+                
+                # Handle avatar selection vs uploaded profile picture
+                if selected_avatar:
+                    update_data['avatar'] = selected_avatar
+                    update_data['profile_picture'] = None  # Clear profile_picture if avatar is chosen
+                elif profile_pic_filename:
+                    update_data['profile_picture'] = profile_pic_filename
+                    update_data['avatar'] = None  # Clear avatar if uploading a new picture
 
-        try:
-            # Prepare update data
-            update_data = {
-                'email': email,
-                'bio': bio,
-                'urls': urls
-            }
+                # Only update if we have data to update
+                if update_data:
+                    # Build the SQL update statement
+                    set_clause = ', '.join([f"{key} = ?" for key in update_data.keys()])
+                    values = list(update_data.values())
+                    values.append(session['username'])
 
-            # Add password if it's being changed
-            if new_password:
-                update_data['password'] = generate_password_hash(new_password)
+                    # Execute the update
+                    with get_db_connection() as conn:
+                        conn.execute(
+                            f"UPDATE users SET {set_clause} WHERE username = ?",
+                            values
+                        )
+                        conn.commit()
 
-            # Add profile picture if it was uploaded
-            if profile_pic_filename:
-                update_data['profile_picture'] = profile_pic_filename
+                    flash('Profile updated successfully!', 'success')
+                
+                return redirect(url_for('settings'))
 
-            # Build the SQL update statement
-            set_clause = ', '.join([f"{key} = ?" for key in update_data.keys()])
-            values = list(update_data.values())
-            values.append(session['username'])
+            except Exception as e:
+                flash(f'Error updating profile: {str(e)}', 'error')
+                
+        # Password change
+        elif action == 'change_password':
+            new_password = request.form.get('new_password')
+            confirm_password = request.form.get('confirm_password')
+            
+            if not new_password:
+                flash('Please enter a new password', 'error')
+                return redirect(url_for('settings'))
+                
+            if new_password != confirm_password:
+                flash('Passwords do not match', 'error')
+                return redirect(url_for('settings'))
+            
+            try:
+                # Update password
+                hashed_password = generate_password_hash(new_password)
+                with get_db_connection() as conn:
+                    conn.execute(
+                        "UPDATE users SET password = ? WHERE username = ?",
+                        (hashed_password, session['username'])
+                    )
+                    conn.commit()
+                    
+                flash('Password updated successfully!', 'success')
+                return redirect(url_for('settings'))
+                
+            except Exception as e:
+                flash(f'Error updating password: {str(e)}', 'error')
+                
+        # Save preferences
+        elif action == 'save_preferences':
+            timezone = request.form.get('timezone')
+            datetime_format = request.form.get('datetime_format')
+            
+            try:
+                update_data = {}
+                if timezone:
+                    update_data['timezone'] = timezone
+                if datetime_format:
+                    update_data['datetime_format'] = datetime_format
+                
+                if update_data:
+                    # Build the SQL update statement
+                    set_clause = ', '.join([f"{key} = ?" for key in update_data.keys()])
+                    values = list(update_data.values())
+                    values.append(session['username'])
 
-            # Execute the update
-            with get_db_connection() as conn:
-                conn.execute(
-                    f"UPDATE users SET {set_clause} WHERE username = ?",
-                    values
-                )
-                conn.commit()
-
-            # Update session if profile picture was changed
-            if profile_pic_filename:
-                session['profile_picture'] = profile_pic_filename
-
-            flash('Profile updated successfully!', 'success')
-            return redirect(url_for('settings'))
-
-        except Exception as e:
-            flash(f'Error updating profile: {str(e)}', 'error')
+                    # Execute the update
+                    with get_db_connection() as conn:
+                        conn.execute(
+                            f"UPDATE users SET {set_clause} WHERE username = ?",
+                            values
+                        )
+                        conn.commit()
+                        
+                flash('Preferences updated successfully!', 'success')
+                return redirect(url_for('settings'))
+                
+            except Exception as e:
+                flash(f'Error updating preferences: {str(e)}', 'error')
 
     # Display settings form with current user data
     return render_template('settings.html',
                          username=session['username'],
-                         user=user)
+                         user=user,
+                         avatars=avatars)
 
 @app.route('/notifications')
 def notifications():
@@ -890,7 +983,7 @@ def notifications():
         # Get read notifications
         read_notifications = conn.execute(
             "SELECT * FROM notifications WHERE user_id = ? AND is_read = 1 ORDER BY timestamp DESC LIMIT 20",
-            (user_id,)  # Limit to 20 read notifications to avoid performance issues
+            (user_id,)
         ).fetchall()
 
     # Render notifications page
@@ -1274,9 +1367,7 @@ def _process_questions(raw_questions, ai_generated=False):
                         'debate_style', 'complex_rephrasing', 'audio_recognition',
                         'basic_vocab', 'simple_sentences']:
             # Handle multiple choice type questions
-            options = q['options']
-            if q.get('shuffle_options', True):
-                options = sample(options, len(options))
+            options = sorted(q['options'])  # Sort options alphabetically
             question_data.update({
                 'options': options,
                 'answer': q['answer']
@@ -1452,16 +1543,36 @@ def submit_quiz():
     passed = 1 if percentage >= 80 else 0  # Pass threshold is 80%
 
     # Calculate points with bonuses
-    base_points = score * POINTS_PER_CORRECT_ANSWER
-    streak_bonus = (max_streak // 3) * STREAK_BONUS  # Bonus every 3 correct in a row
+    base_points = score * get_points_per_correct_answer(difficulty)
+    streak_bonus = (max_streak // 3) * get_perfect_score_bonus(difficulty)  # Bonus every 3 correct in a row
     time_bonus = 0
 
     # Time bonus for quick answers
     avg_time = total_time / total_questions if total_questions > 0 else 0
-    if avg_time < MIN_TIME_FOR_BONUS:
-        time_bonus = base_points * TIME_BONUS_MULTIPLIER * (1 - (avg_time / MIN_TIME_FOR_BONUS))
+    if avg_time < 10:
+        time_bonus = base_points * 0.2 * (1 - (avg_time / 10))
 
     points_earned = int(base_points + streak_bonus + time_bonus)
+
+    # Get user's current rank for this language before adding new points
+    current_progress = get_progress_data(session['user_id'])
+    lang_progress = current_progress['progress'].get(language, {})
+    current_level = lang_progress.get('current_level', 'beginner') if lang_progress else 'beginner'
+    
+    # Determine if user should earn points based on their current level and quiz difficulty
+    should_award_points = True
+    if current_level == 'intermediate' and difficulty == 'beginner':
+        # Intermediate users don't get points for beginner quizzes
+        should_award_points = False
+    elif current_level == 'advanced' and difficulty != 'advanced':
+        # Advanced users only get points for advanced quizzes
+        should_award_points = False
+    
+    # Set points to 0 if user shouldn't be awarded points
+    if not should_award_points:
+        points_earned = 0
+        streak_bonus = 0
+        time_bonus = 0
 
     # Determine if achievements were unlocked
     achievements = []
@@ -1522,9 +1633,6 @@ def submit_quiz():
             elif (total_points_before < LEVEL_REQUIREMENTS['advanced']['points'] and
                   current_total_points >= LEVEL_REQUIREMENTS['advanced']['points']):
                 just_leveled_up = True
-            elif (total_points_before < LEVEL_REQUIREMENTS['fluent']['points'] and
-                  current_total_points >= LEVEL_REQUIREMENTS['fluent']['points']):
-                just_leveled_up = True
 
         # Send level up notification if user reached a new level
         if lang_progress and (lang_progress.get('points_to_next', 1) <= 0 or just_leveled_up):
@@ -1582,6 +1690,9 @@ def submit_quiz():
                          points_earned=points_earned,
                          streak_bonus=streak_bonus,
                          time_bonus=time_bonus,
+                         
+                         # User level info
+                         current_level=current_level,
 
                          # Level up information
                          level_up=lang_progress.get('points_to_next', 1) <= 0 if lang_progress else False,
@@ -1651,16 +1762,19 @@ def admin_login():
         email = request.form['email']
         password = request.form['password']
 
-        # In a production environment, replace this with proper authentication
-        # using database-stored credentials and password hashing
-        admin_email = os.environ.get('ADMIN_EMAIL', 'admin@example.com')
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'adminpassword')
+        # Check if user exists and is an admin
+        with get_db_connection() as conn:
+            user = conn.execute(
+                "SELECT * FROM users WHERE email = ? AND is_admin = 1",
+                (email,)
+            ).fetchone()
 
-        if email == admin_email and password == admin_password:
-            session['admin'] = True
-            return redirect(url_for('admin_dashboard'))
-        else:
-            flash("Invalid email or password for admin.", 'error')
+            if user and check_password_hash(user['password'], password):
+                session['admin'] = True
+                session['admin_id'] = user['id']
+                return redirect(url_for('admin_dashboard'))
+            else:
+                flash("Invalid email or password for admin.", 'error')
 
     return render_template('admin_login.html')
 
@@ -1678,44 +1792,232 @@ def admin_dashboard():
     with get_db_connection() as conn:
         users = conn.execute("SELECT * FROM users").fetchall()
 
-    return render_template('admin_dashboard.html', users=users)
+    return render_template('admin_dashboard.html', 
+                         users=users,
+                         languages=AVAILABLE_LANGUAGES,
+                         quiz_data=QUIZ_DATA)  # Pass quiz data to template
+
+@app.route('/admin/reset_progress/<int:user_id>', methods=['POST'])
+def admin_reset_progress(user_id):
+    """Reset a user's progress"""
+    if 'admin' not in session:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    try:
+        with get_db_connection() as conn:
+            # Delete quiz results
+            conn.execute("DELETE FROM quiz_results_enhanced WHERE user_id = ?", (user_id,))
+            # Delete badges
+            conn.execute("DELETE FROM user_badges WHERE user_id = ?", (user_id,))
+            conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error resetting progress: {e}")
+        return jsonify({'error': 'Database error'}), 500
+
+@app.route('/admin/toggle_admin/<int:user_id>', methods=['POST'])
+def admin_toggle_admin(user_id):
+    """Toggle admin status for a user"""
+    if 'admin' not in session:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    try:
+        # Get the action from the request body
+        data = request.get_json()
+        make_admin = data.get('make_admin', True)  # Default to making admin if not specified
+
+        with get_db_connection() as conn:
+            # Get current admin status
+            user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+
+            # Don't allow removing admin status from the last admin
+            if not make_admin:  # If we're trying to remove admin
+                admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
+                if admin_count <= 1 and user['is_admin'] == 1:
+                    return jsonify({'error': 'Cannot remove the last admin'}), 400
+
+            # Update admin status
+            conn.execute("UPDATE users SET is_admin = ? WHERE id = ?", (1 if make_admin else 0, user_id))
+            conn.commit()
+            
+            return jsonify({'success': True})
+            
+    except Exception as e:
+        print(f"Error updating admin status: {e}")
+        return jsonify({'error': 'Database error'}), 500
+
+@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
+def admin_delete_user(user_id):
+    """Delete a user and all their data"""
+    if 'admin' not in session:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    try:
+        with get_db_connection() as conn:
+            # Delete user's data from all related tables
+            conn.execute("DELETE FROM quiz_results_enhanced WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM user_badges WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        return jsonify({'error': 'Database error'}), 500
+
+@app.route('/admin/add_question', methods=['POST'])
+def admin_add_question():
+    """Add a new quiz question"""
+    if 'admin' not in session:
+        return jsonify({'error': 'Unauthorized access'}), 403
+
+    try:
+        # Get form data
+        language = request.form.get('language')
+        difficulty = request.form.get('difficulty')
+        question = request.form.get('question')
+        options_text = request.form.get('options', '')
+        correct_answer = request.form.get('correct_answer')
+
+        # Input validation
+        if not all([language, difficulty, question, options_text, correct_answer]):
+            return jsonify({'error': 'All fields are required'}), 400
+
+        # Process options - split by newline and clean
+        options = [opt.strip() for opt in options_text.split('\n') if opt.strip()]
+
+        # Validate options
+        if len(options) < 2:
+            return jsonify({'error': 'At least two options are required'}), 400
+
+        # Validate correct answer is in options
+        if correct_answer not in options:
+            return jsonify({'error': 'Correct answer must be one of the options'}), 400
+
+        # Store in database
+        with get_db_connection() as conn:
+            conn.execute('''
+                INSERT INTO quiz_questions 
+                (language, difficulty, question, options, answer)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (language, difficulty, question, json.dumps(options), correct_answer))
+            conn.commit()
+
+        # Reload quiz data from database
+        load_quiz_data()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Question added successfully'
+        }), 200
+
+    except Exception as e:
+        print(f"Error adding question: {str(e)}")
+        return jsonify({'error': f'Error adding question: {str(e)}'}), 500
+
+@app.route('/admin/edit_question/<language>/<difficulty>/<int:question_index>', methods=['POST'])
+def edit_question(language, difficulty, question_index):
+    """Edit a specific quiz question"""
+    if 'admin' not in session:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    try:
+        # Get form data
+        question = request.form.get('question')
+        options_text = request.form.get('options', '')
+        correct_answer = request.form.get('correct_answer')
+
+        # Input validation
+        if not all([question, options_text, correct_answer]):
+            return jsonify({'error': 'All fields are required'}), 400
+
+        # Process options - split by newline and clean
+        options = [opt.strip() for opt in options_text.split('\n') if opt.strip()]
+
+        # Validate options
+        if len(options) < 2:
+            return jsonify({'error': 'At least two options are required'}), 400
+
+        # Validate correct answer is in options
+        if correct_answer not in options:
+            return jsonify({'error': 'Correct answer must be one of the options'}), 400
+
+        # Update in database
+        with get_db_connection() as conn:
+            # Get the question ID
+            question_id = conn.execute('''
+                SELECT id FROM quiz_questions 
+                WHERE language = ? AND difficulty = ? 
+                ORDER BY created_at ASC LIMIT 1 OFFSET ?
+            ''', (language, difficulty, question_index)).fetchone()
+
+            if not question_id:
+                return jsonify({'error': 'Question not found'}), 404
+
+            # Update the question
+            conn.execute('''
+                UPDATE quiz_questions 
+                SET question = ?, options = ?, answer = ?
+                WHERE id = ?
+            ''', (question, json.dumps(options), correct_answer, question_id['id']))
+            conn.commit()
+
+        # Reload quiz data from database
+        load_quiz_data()
+
+        return jsonify({
+            'success': True,
+            'message': 'Question updated successfully'
+        }), 200
+
+    except Exception as e:
+        print(f"Error updating question: {e}")
+        return jsonify({'error': 'Error updating question'}), 500
+
+@app.route('/admin/delete_question/<language>/<difficulty>/<int:question_index>', methods=['POST'])
+def delete_question(language, difficulty, question_index):
+    """Delete a specific quiz question"""
+    if 'admin' not in session:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    try:
+        with get_db_connection() as conn:
+            # Get the question ID
+            question_id = conn.execute('''
+                SELECT id FROM quiz_questions 
+                WHERE language = ? AND difficulty = ? 
+                ORDER BY created_at ASC LIMIT 1 OFFSET ?
+            ''', (language, difficulty, question_index)).fetchone()
+
+            if not question_id:
+                return jsonify({'error': 'Question not found'}), 404
+
+            # Delete the question
+            conn.execute('DELETE FROM quiz_questions WHERE id = ?', (question_id['id'],))
+            conn.commit()
+
+        # Reload quiz data from database
+        load_quiz_data()
+
+        return jsonify({
+            'success': True,
+            'message': 'Question deleted successfully'
+        }), 200
+
+    except Exception as e:
+        print(f"Error deleting question: {e}")
+        return jsonify({'error': 'Error deleting question'}), 500
 
 @app.route('/admin_logout')
 def admin_logout():
-    """
-    Logs out the admin by removing the admin session variable.
-    """
+    """Logs out the admin"""
     session.pop('admin', None)
+    session.pop('admin_id', None)
     flash("You have been logged out from the admin panel.", 'info')
     return redirect(url_for('admin_login'))
-
-@app.route('/delete_user/<int:user_id>', methods=['POST'])
-def delete_user(user_id):
-    """
-    Deletes a user from the database.
-    Only accessible to authenticated admins.
-
-    Args:
-        user_id (int): The ID of the user to delete
-    """
-    if 'admin' not in session:
-        flash("You must be logged in as an admin to delete users.", 'error')
-        return redirect(url_for('admin_login'))
-
-    # Delete the user from the database
-    with get_db_connection() as conn:
-        # First check if the user exists
-        user = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
-
-        if user:
-            # Delete the user
-            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
-            conn.commit()
-            flash(f"User {user['username']} has been deleted.", 'success')
-        else:
-            flash("User not found.", 'error')
-
-    return redirect(url_for('admin_dashboard'))
 
 @app.route('/chatbot', methods=['GET', 'POST'])
 def chatbot():
@@ -1738,19 +2040,105 @@ def chatbot():
         data = request.get_json()
         message = data.get('message', '')
         language = data.get('language', 'english')
+        session_id = data.get('session_id')
         
         if not message:
             return jsonify({'error': 'Message is required'}), 400
 
-        prompt = f"""You are a language learning chatbot. Respond to the user in {language}. Keep responses concise.
-User: {message}
-Chatbot: """
+        # Create or update chat session
+        with get_db_connection() as conn:
+            if session_id:
+                # Update existing session
+                conn.execute('''
+                    UPDATE chat_sessions 
+                    SET last_message_at = CURRENT_TIMESTAMP
+                    WHERE session_id = ? AND user_id = ?
+                ''', (session_id, session['user_id']))
+            else:
+                # Create new session
+                session_id = f"sess-{secrets.token_hex(16)}"
+                conn.execute('''
+                    INSERT INTO chat_sessions (session_id, user_id, language)
+                    VALUES (?, ?, ?)
+                ''', (session_id, session['user_id'], language))
+
+        # Create a more detailed prompt for better language learning interaction
+        prompt = f"""You are a helpful and encouraging language tutor teaching {language}. 
+        The student's message is: "{message}"
+        
+        Please respond in {language} and follow these guidelines:
+        - If the student's message is in {language}, check for any grammar or vocabulary errors
+        - If the student's message is in another language, help them express it in {language}
+        - Keep responses friendly and educational
+        - Include corrections when necessary
+        - Provide encouragement
+        
+        Response:"""
+
         response_text = get_gemini_response(prompt)
-        return jsonify({'response': response_text}), 200
+        
+        # Store the message and response
+        with get_db_connection() as conn:
+            conn.execute('''
+                INSERT INTO chat_messages (session_id, message, bot_response)
+                VALUES (?, ?, ?)
+            ''', (session_id, message, response_text))
+            conn.commit()
+
+        return jsonify({
+            'response': response_text,
+            'session_id': session_id
+        }), 200
     
     return render_template('chatbot.html', 
                          username=session['username'],
                          notification_count=notification_count)
+
+@app.route('/chat_history/sessions')
+def get_chat_sessions():
+    """
+    Returns a list of chat sessions for the current user.
+    """
+    if 'username' not in session:
+        return jsonify([])
+    
+    with get_db_connection() as conn:
+        sessions = conn.execute('''
+            SELECT cs.session_id, cs.language, cs.started_at, cs.last_message_at,
+                   (SELECT message FROM chat_messages WHERE session_id = cs.session_id ORDER BY timestamp ASC LIMIT 1) as first_message
+            FROM chat_sessions cs
+            WHERE cs.user_id = ?
+            ORDER BY cs.last_message_at DESC
+        ''', (session['user_id'],)).fetchall()
+    
+    return jsonify([dict(session) for session in sessions])
+
+@app.route('/chat_history/session/<session_id>')
+def get_session_messages(session_id):
+    """
+    Returns all messages for a specific chat session.
+    """
+    if 'username' not in session:
+        return jsonify([])
+    
+    with get_db_connection() as conn:
+        # Verify the session belongs to the user
+        session_owner = conn.execute(
+            'SELECT user_id FROM chat_sessions WHERE session_id = ?',
+            (session_id,)
+        ).fetchone()
+        
+        if not session_owner or session_owner['user_id'] != session['user_id']:
+            return jsonify([])
+        
+        messages = conn.execute('''
+            SELECT message, bot_response, timestamp
+            FROM chat_messages
+            WHERE session_id = ?
+            ORDER BY timestamp ASC
+        ''', (session_id,)).fetchall()
+    
+    return jsonify([dict(message) for message in messages])
 
 def get_gemini_response(prompt):
     """
@@ -1808,84 +2196,505 @@ def get_gemini_response(prompt):
         print(f"Full traceback: {traceback.format_exc()}")
         return "I apologize, but there was an error processing your request. Please try again."
 
+# --- Achievement Definitions ---
+ACHIEVEMENTS = {
+    'hot_streak': {
+        'name': 'Hot Streak',
+        'description': '5 correct quizzes in a row',
+        'check': lambda user_data: user_data['streak'] >= 5
+    },
+    'night_owl': {
+        'name': 'Night Owl',
+        'description': 'Complete a quiz after midnight',
+        'check': lambda user_data, current_time: current_time.hour >= 0 and current_time.hour < 4
+    },
+    'early_bird': {
+        'name': 'Early Bird',
+        'description': 'Complete a quiz before 7am',
+        'check': lambda user_data, current_time: current_time.hour >= 4 and current_time.hour < 7
+    },
+    'polyglot': {
+        'name': 'Polyglot',
+        'description': 'Complete quizzes in all available languages',
+        'check': lambda user_data: len(user_data['completed_languages']) >= len(AVAILABLE_LANGUAGES)
+    },
+    'comeback_kid': {
+        'name': 'Comeback Kid',
+        'description': 'Get a perfect score after failing a quiz',
+        'check': lambda user_data, last_quiz, current_quiz: 
+            last_quiz and not last_quiz['passed'] and current_quiz['score'] == current_quiz['total']
+    },
+    'speed_demon': {
+        'name': 'Speed Demon',
+        'description': 'Finish a quiz in record time',
+        'check': lambda user_data, quiz_time: quiz_time < 60  # Less than 60 seconds
+    },
+    'consistency_champ': {
+        'name': 'Consistency Champ',
+        'description': 'Complete quizzes 5 days in a row',
+        'check': lambda user_data: user_data['daily_streak'] >= 5
+    },
+    'quick_thinker': {
+        'name': 'Quick Thinker',
+        'description': '5 questions correctly in under 10 seconds each',
+        'check': lambda user_data, quick_answers: quick_answers >= 5
+    },
+    'basic_vocab': {
+        'name': 'Basic Vocab',
+        'description': 'Score 300 points in Beginner quizzes',
+        'check': lambda user_data: user_data['beginner_points'] >= 300
+    },
+    'language_guru': {
+        'name': 'Language Guru',
+        'description': 'Having 5 streak',
+        'check': lambda user_data: user_data['streak'] >= 5
+    },
+    'fluency_builder': {
+        'name': 'Fluency Builder',
+        'description': 'Complete 10 Advanced quizzes',
+        'check': lambda user_data: user_data['advanced_quizzes_completed'] >= 10
+    },
+    'master_of_language': {
+        'name': 'Master of Language',
+        'description': 'Reach 1500 total points',
+        'check': lambda user_data: user_data['total_points'] >= 1500
+    }
+}
+
+def check_achievements(user_data, quiz_result=None):
+    """
+    Check and award achievements based on user data and quiz results
+    
+    Args:
+        user_data (dict): User's progress and achievement data
+        quiz_result (dict, optional): Results from the most recent quiz
+        
+    Returns:
+        list: List of newly earned achievements
+    """
+    from datetime import datetime
+    current_time = datetime.now()
+    
+    new_achievements = []
+    
+    for achievement_id, achievement in ACHIEVEMENTS.items():
+        # Skip if already earned
+        if achievement_id in user_data['badges']:
+            continue
+            
+        # Prepare check parameters
+        check_params = {'user_data': user_data}
+        
+        if quiz_result:
+            check_params.update({
+                'current_time': current_time,
+                'last_quiz': user_data.get('last_quiz'),
+                'current_quiz': quiz_result,
+                'quiz_time': quiz_result.get('completion_time', float('inf')),
+                'quick_answers': quiz_result.get('quick_answers', 0)
+            })
+        
+        # Check if achievement is earned
+        try:
+            if achievement['check'](**{k: v for k, v in check_params.items() 
+                                    if k in achievement['check'].__code__.co_varnames}):
+                user_data['badges'].append(achievement_id)
+                new_achievements.append(achievement_id)
+        except Exception as e:
+            print(f"Error checking achievement {achievement_id}: {str(e)}")
+            
+    return new_achievements
+
+def load_quiz_data():
+    """Load quiz questions from database into QUIZ_DATA dictionary"""
+    global QUIZ_DATA
+    QUIZ_DATA = {}
+    
+    with get_db_connection() as conn:
+        questions = conn.execute('SELECT * FROM quiz_questions').fetchall()
+        
+        for q in questions:
+            # Initialize language and difficulty if they don't exist
+            if q['language'] not in QUIZ_DATA:
+                QUIZ_DATA[q['language']] = {}
+            if q['difficulty'] not in QUIZ_DATA[q['language']]:
+                QUIZ_DATA[q['language']][q['difficulty']] = []
+            
+            # Add question to QUIZ_DATA
+            QUIZ_DATA[q['language']][q['difficulty']].append({
+                'question': q['question'],
+                'type': q['question_type'],
+                'options': json.loads(q['options']),
+                'answer': q['answer'],
+                'points': q['points']
+            })
+
+@app.route('/admin/import_questions', methods=['POST'])
+def admin_import_questions():
+    """Import questions from Excel file"""
+    if 'admin' not in session:
+        return jsonify({'error': 'Unauthorized access'}), 403
+
+    try:
+        # Check if file was uploaded
+        if 'excel_file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+        
+        file = request.files['excel_file']
+        
+        # Check if file is empty
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+            
+        # Check file extension
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            return jsonify({'error': 'Invalid file format. Please upload an Excel file (.xlsx or .xls)'}), 400
+
+        # Read Excel file
+        import pandas as pd
+        df = pd.read_excel(file)
+
+        # Validate columns
+        required_columns = ['Language', 'Difficulty', 'Question', 'Options', 'Correct Answer']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return jsonify({'error': f'Missing columns: {", ".join(missing_columns)}'}), 400
+
+        # Connect to database
+        with get_db_connection() as conn:
+            success_count = 0
+            error_count = 0
+
+            # Process each row
+            for index, row in df.iterrows():
+                try:
+                    # Validate difficulty
+                    if row['Difficulty'].lower() not in ['beginner', 'intermediate', 'advanced']:
+                        continue
+
+                    # Process options - split by newline or semicolon
+                    options = [opt.strip() for opt in str(row['Options']).replace('\n', ';').split(';') if opt.strip()]
+                    
+                    # Skip if less than 2 options
+                    if len(options) < 2:
+                        continue
+
+                    # Skip if correct answer not in options
+                    if str(row['Correct Answer']).strip() not in options:
+                        continue
+
+                    # Insert question into database
+                    conn.execute('''
+                        INSERT INTO quiz_questions 
+                        (language, difficulty, question, options, answer)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (
+                        str(row['Language']).strip(),
+                        str(row['Difficulty']).lower().strip(),
+                        str(row['Question']).strip(),
+                        json.dumps(options),
+                        str(row['Correct Answer']).strip()
+                    ))
+                    success_count += 1
+                except Exception as e:
+                    error_count += 1
+                    print(f"Error processing row {index + 2}: {str(e)}")
+
+            conn.commit()
+
+        # Reload quiz data
+        load_quiz_data()
+
+        # Return results
+        if success_count > 0:
+            message = f"Successfully imported {success_count} questions"
+            if error_count > 0:
+                message += f" ({error_count} failed)"
+            return jsonify({
+                'success': True,
+                'message': message
+            }), 200
+        else:
+            return jsonify({'error': 'No valid questions found in the file'}), 400
+
+    except Exception as e:
+        print(f"Error importing questions: {str(e)}")
+        return jsonify({'error': f'Error importing questions: {str(e)}'}), 500
+
+@app.route('/admin/delete_questions', methods=['POST'])
+def admin_delete_questions():
+    """Delete multiple questions at once"""
+    if 'admin' not in session:
+        return jsonify({'error': 'Unauthorized access'}), 403
+
+    try:
+        data = request.get_json()
+        questions_to_delete = data.get('questions', [])
+        
+        if not questions_to_delete:
+            return jsonify({'error': 'No questions specified'}), 400
+
+        with get_db_connection() as conn:
+            # Sort questions by index in descending order to avoid index shifting
+            questions_to_delete.sort(key=lambda x: x['index'], reverse=True)
+            
+            for question in questions_to_delete:
+                language = question['language']
+                difficulty = question['difficulty']
+                index = question['index']
+                
+                # Delete question from database
+                conn.execute('''
+                    DELETE FROM quiz_questions 
+                    WHERE language = ? AND difficulty = ? 
+                    AND id IN (
+                        SELECT id FROM quiz_questions 
+                        WHERE language = ? AND difficulty = ? 
+                        LIMIT 1 OFFSET ?
+                    )
+                ''', (language, difficulty, language, difficulty, index))
+            
+            conn.commit()
+
+        # Reload quiz data after deletion
+        load_quiz_data()
+        
+        return jsonify({'success': True}), 200
+        
+    except Exception as e:
+        print(f"Error deleting questions: {str(e)}")
+        return jsonify({'error': 'Failed to delete questions'}), 500
+
+@app.route('/deactivate_account', methods=['POST'])
+def deactivate_account():
+    """
+    Deactivates a user account (currently just logs out the user).
+    In a production environment, this would set a flag in the database.
+    """
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    # Here you can implement actual deactivation logic (e.g., set a flag in DB)
+    # For now, just log the user out
+    flash('Your account has been deactivated. You have been logged out.', 'info')
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/close_account', methods=['POST'])
+def close_account():
+    """
+    Permanently deletes a user account and all associated data.
+    This includes quiz results, badges, notifications, chat history, etc.
+    """
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    username = session['username']
+    user_id = session['user_id']
+    
+    try:
+        with get_db_connection() as conn:
+            # Begin transaction
+            conn.execute("BEGIN TRANSACTION")
+            
+            # Delete user's chat data
+            # First get all session IDs
+            session_ids = [row['session_id'] for row in 
+                          conn.execute("SELECT session_id FROM chat_sessions WHERE user_id = ?", 
+                                      (user_id,)).fetchall()]
+            
+            # Delete chat messages for those sessions
+            for session_id in session_ids:
+                conn.execute("DELETE FROM chat_messages WHERE session_id = ?", (session_id,))
+            
+            # Delete chat sessions
+            conn.execute("DELETE FROM chat_sessions WHERE user_id = ?", (user_id,))
+            
+            # Delete other user data
+            conn.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM user_badges WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM quiz_results WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM quiz_results_enhanced WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM chat_history WHERE user_id = ?", (user_id,))
+            
+            # Finally delete the user
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            
+            # Commit transaction
+            conn.execute("COMMIT")
+            
+            flash('Your account has been permanently deleted. You may register a new account.', 'info')
+            session.clear()
+            return redirect(url_for('register'))
+            
+    except Exception as e:
+        # Rollback transaction in case of error
+        with get_db_connection() as conn:
+            conn.execute("ROLLBACK")
+        
+        print(f"Error closing account: {str(e)}")
+        print(f"Full traceback: {traceback.format_exc()}")
+        flash(f'Error closing account: {str(e)}', 'error')
+        return redirect(url_for('settings'))
+
+# --- Function to ensure database has required columns ---
+def ensure_user_columns():
+    """
+    Ensures that the users table has all required columns.
+    Adds new columns if they don't exist.
+    """
+    columns = [
+        ('name', 'TEXT'),
+        ('phone', 'TEXT'),
+        ('location', 'TEXT'),
+        ('website', 'TEXT'),
+        ('avatar', 'TEXT'),
+        ('timezone', 'TEXT'),
+        ('datetime_format', 'TEXT')
+    ]
+    with get_db_connection() as conn:
+        for col, typ in columns:
+            try:
+                conn.execute(f'ALTER TABLE users ADD COLUMN {col} {typ};')
+            except Exception:
+                pass  # Already exists
+        conn.commit()
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    """
+    Handles chat interactions with the AI language tutor.
+    Stores conversation history in sessions and messages.
+    """
+    if 'username' not in session:
+        return jsonify({'error': 'Please log in to use the chatbot'}), 401
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data received'}), 400
+
+        message = data.get('message', '').strip()
+        language = data.get('language', 'english').strip()
+        session_id = data.get('session_id')
+
+        if not message:
+            return jsonify({'error': 'Message is required'}), 400
+
+        # Create or update chat session
+        with get_db_connection() as conn:
+            if session_id:
+                # Update existing session
+                conn.execute('''
+                    UPDATE chat_sessions 
+                    SET last_message_at = CURRENT_TIMESTAMP
+                    WHERE session_id = ? AND user_id = ?
+                ''', (session_id, session['user_id']))
+            else:
+                # Create new session
+                session_id = f"sess-{secrets.token_hex(16)}"
+                conn.execute('''
+                    INSERT INTO chat_sessions (session_id, user_id, language)
+                    VALUES (?, ?, ?)
+                ''', (session_id, session['user_id'], language))
+
+        # Create a more detailed prompt for better language learning interaction
+        prompt = f"""You are a helpful and encouraging language tutor teaching {language}. 
+        The student's message is: "{message}"
+        
+        Please respond in {language} and follow these guidelines:
+        - If the student's message is in {language}, check for any grammar or vocabulary errors
+        - If the student's message is in another language, help them express it in {language}
+        - Keep responses friendly and educational
+        - Include corrections when necessary
+        - Provide encouragement
+        
+        Response:"""
+
+        response_text = get_gemini_response(prompt)
+        
+        # Store the message and response
+        with get_db_connection() as conn:
+            conn.execute('''
+                INSERT INTO chat_messages (session_id, message, bot_response)
+                VALUES (?, ?, ?)
+            ''', (session_id, message, response_text))
+            conn.commit()
+
+        return jsonify({
+            'response': response_text,
+            'session_id': session_id
+        }), 200
+
+    except Exception as e:
+        print(f"Error in chat route: {str(e)}")
+        print(f"Full traceback: {traceback.format_exc()}")
+        return jsonify({'error': 'An error occurred processing your message'}), 500
+
 if __name__ == '__main__':
     """
     Application entry point.
     Initializes the database, creates necessary directories, and starts the Flask server.
     """
     # Initialize the main database
-    from init_db import initialize_database
+    from scripts.init_db import initialize_database
     initialize_database()
 
-    # Ensure upload folder exists for profile pictures and other uploads
+    # Ensure required directories exist
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(os.path.join('static', 'avatars'), exist_ok=True)
+    
+    # Copy default avatars if the avatars directory is empty
+    avatars_dir = os.path.join('static', 'avatars')
+    if os.path.exists(avatars_dir) and not os.listdir(avatars_dir):
+        # Create some default avatars if they don't exist
+        try:
+            import shutil
+            default_avatars_dir = os.path.join('static', 'images', 'default_avatars')
+            if os.path.exists(default_avatars_dir):
+                for avatar in os.listdir(default_avatars_dir):
+                    if avatar.lower().endswith(('.png', '.jpg', '.jpeg')):
+                        shutil.copy(
+                            os.path.join(default_avatars_dir, avatar),
+                            os.path.join(avatars_dir, avatar)
+                        )
+            else:
+                # If no default avatars exist, create placeholder image
+                print("No default avatars found. Avatar selection will be empty until you add some images.")
+        except Exception as e:
+            print(f"Warning: Could not copy default avatars: {str(e)}")
 
-    # Create database tables if they don't exist
+    # Make sure users table has all required columns
+    ensure_user_columns()
+
+    # Create chat history tables if they don't exist
     with get_db_connection() as conn:
-        # Users table - stores user account information
+        # Chat sessions table
         conn.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,              -- Stored as a hash
-                security_answer TEXT NOT NULL,       -- For account recovery
-                is_admin INTEGER DEFAULT 0,          -- Admin flag
-                reset_token TEXT,                    -- For password reset
-                bio TEXT,                            -- User profile bio
-                urls TEXT,                           -- Social media links
-                profile_picture TEXT,                -- Profile picture filename
-                dark_mode INTEGER DEFAULT 0          -- UI preference
-            )
-        ''')
-
-        # Quiz results table - stores detailed quiz results
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS quiz_results_enhanced (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                session_id TEXT PRIMARY KEY,
                 user_id INTEGER NOT NULL,
-                language TEXT NOT NULL,              -- Quiz language
-                difficulty TEXT NOT NULL,            -- Quiz difficulty level
-                score INTEGER NOT NULL,              -- Number of correct answers
-                total INTEGER NOT NULL,              -- Total number of questions
-                percentage REAL NOT NULL,            -- Score percentage
-                passed INTEGER DEFAULT 0,            -- Whether the quiz was passed (≥80%)
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                question_details TEXT NOT NULL,      -- JSON with detailed question data
-                points_earned INTEGER DEFAULT 0,     -- Points earned from this quiz
-                streak_bonus INTEGER DEFAULT 0,      -- Bonus points from streaks
-                time_bonus INTEGER DEFAULT 0,        -- Bonus points from fast answers
+                language TEXT NOT NULL,
+                started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_message_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         ''')
 
-        # User badges table - tracks achievements
+        # Chat messages table
         conn.execute('''
-            CREATE TABLE IF NOT EXISTS user_badges (
+            CREATE TABLE IF NOT EXISTS chat_messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                language TEXT NOT NULL,              -- Language the badge was earned in
-                badge_id TEXT NOT NULL,              -- Badge identifier
-                earned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id),
-                UNIQUE(user_id, language, badge_id)  -- Prevent duplicate badges
-            )
-        ''')
-
-        # Notifications table - stores user notifications
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS notifications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                message TEXT NOT NULL,               -- Notification message
+                session_id TEXT NOT NULL,
+                message TEXT NOT NULL,
+                bot_response TEXT NOT NULL,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                is_read INTEGER DEFAULT 0,           -- Whether notification has been read
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (session_id) REFERENCES chat_sessions (session_id)
             )
         ''')
-
         conn.commit()
 
+    # Load quiz data from database
+    load_quiz_data()
+
     # Start the Flask application
-    # In production, you would use a proper WSGI server like Gunicorn
     app.run(debug=True)

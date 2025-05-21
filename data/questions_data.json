@@ -1,0 +1,18 @@
+{
+  "questions": [
+    {
+      "Language": "Chinese",
+      "Difficulty": "beginner",
+      "Question": "苹果 (píngguǒ)",
+      "Options": "一种红色或绿色的水果 🍎;一种黄色的蔬菜;一种肉类;一种饮料",
+      "Correct Answer": "一种黄色的蔬菜"
+    },
+    {
+      "Language": "Chinese",
+      "Difficulty": "beginner",
+      "Question": "香蕉 (xiāngjiāo)",
+      "Options": "一种长的黄色水果 🍌;一种红色蔬菜;一种面包;一种甜饮料",
+      "Correct Answer": "一种甜饮料"
+    }
+  ]
+}

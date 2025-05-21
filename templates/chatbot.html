@@ -279,6 +279,7 @@
             </div>
         </div>
     </div>
+
     <script>
         let messageInput = document.getElementById('message-input');
         let messagesContainer = document.getElementById('chat-messages');
@@ -400,6 +401,7 @@
             loadSessions();
             startNewChat();
         };
+        
         messageInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 sendMessage();
