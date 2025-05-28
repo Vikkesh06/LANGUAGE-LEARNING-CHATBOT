@@ -413,6 +413,18 @@
             <p class="display-6 text-primary">+{{ points_earned }} pts</p>
             <p class="text-muted">Added to your {{ language }} progress</p>
 
+            {% if points_earned == 0 %}
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>No points awarded.</strong> 
+                {% if current_level == 'intermediate' %}
+                At Intermediate rank, you only earn points from Intermediate or Advanced difficulty quizzes.
+                {% elif current_level == 'advanced' %}
+                At Advanced rank, you only earn points from Advanced difficulty quizzes.
+                {% endif %}
+            </div>
+            {% endif %}
+
             <div class="bonus-breakdown">
                 <div class="bonus-item">
                     <i class="fas fa-check-circle"></i>
