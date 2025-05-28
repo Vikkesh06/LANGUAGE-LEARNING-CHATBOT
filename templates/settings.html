@@ -6,6 +6,7 @@
     <title>Settings | Language Learning Assistant</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+
     <style>
         body { background: #f8f9fb; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
         .settings-wrapper { display: flex; min-height: 100vh; }
@@ -36,9 +37,7 @@
         label { font-size: 14px; color: #888; margin-bottom: 6px; font-weight: 500; }
         input, select, textarea { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; background: #fafbfc; }
         input:focus, select:focus, textarea:focus { border-color: #e91e63; outline: none; }
-        .avatar-list { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-        .avatar-list img { width: 48px; height: 48px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: border 0.2s; }
-        .avatar-list img.selected { border: 2px solid #e91e63; }
+
         .save-btn { background: #e91e63; color: #fff; border: none; border-radius: 6px; padding: 14px 32px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 20px; transition: background 0.2s; }
         .save-btn:hover { background: #c2185b; }
         .back-btn {
@@ -70,7 +69,7 @@
         .danger-btn { background: #c2185b; color: #fff; border: none; border-radius: 6px; padding: 10px 24px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px; }
         .danger-btn:hover { background: #ad1457; }
         .profile-pic-section { display: flex; gap: 30px; align-items: flex-start; margin-bottom: 20px; }
-        .profile-pic-preview { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 3px solid #e91e63; }
+
         .divider { border-bottom: 1px solid #eee; margin: 30px 0; }
         textarea#bio { min-height: 120px; resize: vertical; font-family: 'Segoe UI', Arial, sans-serif; }
         .url-inputs { display: flex; flex-direction: column; gap: 10px; }
@@ -133,6 +132,7 @@
             .sidebar { width: 100%; flex-direction: row; border-right: none; border-bottom: 1px solid #eee; }
             .settings-content { padding: 30px 10px; }
             .profile-pic-section { flex-direction: column; }
+
         }
     </style>
 </head>
@@ -168,6 +168,7 @@
             <!-- Profile Section -->
             <form method="POST" enctype="multipart/form-data" action="{{ url_for('settings') }}">
                 <input type="hidden" name="action" value="save_profile">
+
                 <div class="settings-card" id="profile-section">
                     <h2>Profile Information</h2>
                     <div class="profile-pic-section">
@@ -179,228 +180,14 @@
                                  src="{% if user.profile_picture %}{{ url_for('static', filename='uploads/' + user.profile_picture) }}{% elif user.avatar %}{{ url_for('static', filename='avatars/' + user.avatar) }}{% else %}{{ url_for('static', filename='images/default-profile.png') }}{% endif %}"
                                  alt="Profile Picture Preview">
                         </div>
-                        <div>
-                            <label>Or choose an avatar:</label>
-                            <div class="avatar-list">
-                                {% for avatar in avatars %}
-                                <img src="{{ url_for('static', filename='avatars/' + avatar) }}" alt="Avatar"
-                                     onclick="selectAvatar(this, '{{ avatar }}')"
-                                     class="{% if user.avatar == avatar %}selected{% endif %}">
+
                                 {% endfor %}
                             </div>
                             <input type="hidden" name="selected_avatar" id="selected_avatar" value="{{ user.avatar or '' }}">
                         </div>
-                    </div>
-                    <div class="divider"></div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="name">Name</label>
-                            <input type="text" id="name" name="name" value="{{ user.name or '' }}">
-                        </div>
-                        <div class="form-group">
-                            <label for="username">Username</label>
-                            <input type="text" id="username" name="username" value="{{ user.username }}" readonly>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="email">Email Address</label>
-                            <input type="email" id="email" name="email" value="{{ user.email }}" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="phone">Phone Number</label>
-                            <input type="text" id="phone" name="phone" value="{{ user.phone or '' }}">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="location">Location</label>
-                            <input type="text" id="location" name="location" value="{{ user.location or '' }}">
-                        </div>
-                        <div class="form-group">
-                            <label for="website">Website</label>
-                            <input type="text" id="website" name="website" value="{{ user.website or '' }}">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="bio">Bio</label>
-                        <textarea id="bio" name="bio" maxlength="200">{{ user.bio or '' }}</textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>URLs and Social Media</label>
-                        <div class="url-inputs">
-                            {% if user.urls %}
-                                {% set url_list = user.urls.split('\n') %}
-                                {% for url in url_list %}
-                                    <div class="url-input-container">
-                                        <input type="text" name="urls" placeholder="https://example.com" value="{{ url }}">
-                                        <button type="button" class="remove-url-btn" onclick="removeUrlInput(this)">×</button>
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <div class="url-input-container">
-                                    <input type="text" name="urls" placeholder="https://example.com">
-                                    <button type="button" class="remove-url-btn" onclick="removeUrlInput(this)">×</button>
-                                </div>
-                            {% endif %}
-                            <button type="button" class="add-url-btn" onclick="addUrlInput()">+ Add URL</button>
-                        </div>
-                    </div>
-                    
-                    <div class="button-group">
-                        <a href="{{ url_for('dashboard') }}" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
-                        <button class="save-btn" type="submit">Save Profile</button>
-                    </div>
-                </div>
-            </form>
-            
-            <!-- Password Section -->
-            <form method="POST" action="{{ url_for('settings') }}">
-                <input type="hidden" name="action" value="change_password">
-                <div class="settings-card" id="password-section" style="display:none;">
-                    <h2>Change Password</h2>
-                    <div class="form-group">
-                        <label for="new_password">New Password</label>
-                        <input type="password" id="new_password" name="new_password" pattern=".{8,}" title="At least 8 characters">
-                        <small>Leave blank to keep current password. New password must be at least 8 characters.</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="confirm_password">Confirm New Password</label>
-                        <input type="password" id="confirm_password" name="confirm_password">
-                    </div>
-                    <div class="button-group">
-                        <a href="{{ url_for('dashboard') }}" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
-                        <button class="save-btn" type="submit">Change Password</button>
-                    </div>
-                </div>
-            </form>
-            
-            <!-- Preferences Section -->
-            <form method="POST" action="{{ url_for('settings') }}">
-                <input type="hidden" name="action" value="save_preferences">
-                <div class="settings-card" id="preferences-section" style="display:none;">
-                    <h2>Preferences</h2>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="timezone">Time Zone</label>
-                            <select id="timezone" name="timezone">
-                                <option value="">Select Time Zone</option>
-                                <option value="UTC" {% if user.timezone == 'UTC' %}selected{% endif %}>UTC</option>
-                                <option value="America/New_York" {% if user.timezone == 'America/New_York' %}selected{% endif %}>America/New_York</option>
-                                <option value="Europe/London" {% if user.timezone == 'Europe/London' %}selected{% endif %}>Europe/London</option>
-                                <option value="Asia/Kolkata" {% if user.timezone == 'Asia/Kolkata' %}selected{% endif %}>Asia/Kolkata</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="datetime_format">Date/Time Format</label>
-                            <select id="datetime_format" name="datetime_format">
-                                <option value="MM/DD/YYYY" {% if user.datetime_format == 'MM/DD/YYYY' %}selected{% endif %}>MM/DD/YYYY</option>
-                                <option value="DD/MM/YYYY" {% if user.datetime_format == 'DD/MM/YYYY' %}selected{% endif %}>DD/MM/YYYY</option>
-                                <option value="YYYY-MM-DD" {% if user.datetime_format == 'YYYY-MM-DD' %}selected{% endif %}>YYYY-MM-DD</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="button-group">
-                        <a href="{{ url_for('dashboard') }}" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
-                        <button class="save-btn" type="submit">Save Preferences</button>
-                    </div>
-                </div>
-            </form>
-            
-            <!-- Account Section -->
-            <div class="settings-card danger-zone" id="account-section" style="display:none;">
-                <h3>Account Closure / Deactivation</h3>
-                <p>You can temporarily deactivate your account or permanently close it. Deactivation will hide your profile until you reactivate. Permanent closure will delete your data after 30 days.</p>
-                <form id="deactivate-form" method="POST" action="{{ url_for('deactivate_account') }}" style="display:inline;">
-                    <button class="danger-btn" type="submit">Deactivate Account</button>
-                </form>
-                <form id="close-form" method="POST" action="{{ url_for('close_account') }}" style="display:inline;">
-                    <button class="danger-btn" type="submit">Close Account</button>
-                </form>
-                <div style="margin-top: 20px;">
-                    <a href="{{ url_for('dashboard') }}" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
-                </div>
-            </div>
-        </main>
-    </div>
 
-    <script>
-        // Section navigation
-        function showSection(section) {
-            ['profile', 'password', 'preferences', 'account'].forEach(function(sec) {
-                document.getElementById(sec + '-section').style.display = (sec === section) ? '' : 'none';
-                document.querySelector('.sidebar nav a[href="#' + sec + '"]').classList.toggle('active', sec === section);
-            });
-        }
-        
-        // Profile picture preview
-        function previewProfilePic(input) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('profile-pic-preview').src = e.target.result;
-                    document.getElementById('sidebar-profile-pic').src = e.target.result;
-                }
-                reader.readAsDataURL(input.files[0]);
-                // Deselect avatar if uploading a new picture
-                document.querySelectorAll('.avatar-list img').forEach(i => i.classList.remove('selected'));
-                document.getElementById('selected_avatar').value = '';
-            }
-        }
-        
-        // Avatar selection
-        function selectAvatar(img, avatarName) {
-            document.querySelectorAll('.avatar-list img').forEach(i => i.classList.remove('selected'));
-            img.classList.add('selected');
-            document.getElementById('selected_avatar').value = avatarName;
-            document.getElementById('profile-pic-preview').src = img.src;
-            document.getElementById('sidebar-profile-pic').src = img.src;
-            // Clear file input if avatar is chosen
-            document.querySelector('input[type="file"][name="profile_picture"]').value = '';
-        }
-        
-        // Add new URL input field
-        function addUrlInput() {
-            const container = document.querySelector('.url-inputs');
-            const inputContainer = document.createElement('div');
-            inputContainer.className = 'url-input-container';
-            
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.name = 'urls';
-            input.placeholder = 'https://';
-            
-            const removeBtn = document.createElement('button');
-            removeBtn.type = 'button';
-            removeBtn.className = 'remove-url-btn';
-            removeBtn.textContent = '×';
-            removeBtn.onclick = function() { removeUrlInput(this); };
-            
-            inputContainer.appendChild(input);
-            inputContainer.appendChild(removeBtn);
-            
-            container.insertBefore(inputContainer, document.querySelector('.add-url-btn'));
-        }
-        
-        // Remove URL input field
-        function removeUrlInput(button) {
-            const container = button.parentElement;
-            container.remove();
-        }
-        
-        // Auto-hide flash messages after 3 seconds
-        setTimeout(() => {
-            const flashMessages = document.querySelectorAll('.flash-message');
-            flashMessages.forEach(msg => {
-                msg.style.display = 'none';
-            });
-        }, 3000);
-        
-        // On page load, show profile section
-        document.addEventListener('DOMContentLoaded', function() {
-            showSection('profile');
-        });
-    </script>
-</body>
-</html>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+<
