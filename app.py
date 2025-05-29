@@ -16,9 +16,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from collections import defaultdict
 from random import sample, shuffle
+from typing import List
+from pathlib import Path
 
 # Third-party imports
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -1107,47 +1109,53 @@ def quiz():
 
 @app.route('/quiz/<language>/<difficulty>')
 def quiz_language_difficulty(language, difficulty):
-    """
-    Generates and displays quiz questions for a specific language and difficulty level
-    using pre-defined questions from quiz_data.py.
-
-    Args:
-        language (str): The language for the quiz
-        difficulty (str): The difficulty level (beginner, intermediate, advanced)
-    """
-    # Ensure user is logged in
-    if 'username' not in session:
+    # Fix session check to match login logic
+    if 'username' not in session or not session.get('verified'):
         return redirect(url_for('login'))
 
-    # Check if language exists in QUIZ_DATA
-    if language not in QUIZ_DATA:
-        flash(f"Language '{language}' not available", 'error')
+    # Check if difficulty is valid
+    if difficulty not in ['beginner', 'intermediate', 'advanced']:
+        flash('Invalid difficulty level selected.', 'danger')
         return redirect(url_for('quiz'))
 
-    # Check if difficulty exists for this language
-    if difficulty not in QUIZ_DATA.get(language, {}):
-        flash(f"Difficulty level '{difficulty}' not available for {language}", 'error')
+    try:
+        with get_db_connection() as conn:
+            questions = conn.execute(
+                'SELECT * FROM quiz_questions WHERE language = ? AND difficulty = ? ORDER BY RANDOM() LIMIT 10',
+                (language, difficulty)
+            ).fetchall()
+
+            if not questions:
+                default_questions = get_default_questions(language, difficulty)
+                if default_questions:
+                    # Always process default questions to add 'number' and other fields
+                    processed_questions = _process_questions(default_questions)
+                else:
+                    flash(f'No {language} {difficulty} questions available at this time.', 'warning')
+                    return redirect(url_for('quiz'))
+            else:
+                question_list = []
+                for q in questions:
+                    question_dict = {}
+                    for key in q.keys():
+                        value = q[key]
+                        if key in ['options', 'words', 'pairs'] and value:
+                            try:
+                                value = json.loads(value)
+                            except Exception:
+                                pass
+                        question_dict[key] = value
+                    question_list.append(question_dict)
+                matching_question_index = 0
+                processed_questions = _process_questions(question_list, matching_question_index=matching_question_index)
+        return render_template('quiz_questions.html',
+                               questions=processed_questions,
+                               language=language,
+                               difficulty=difficulty)
+    except Exception as e:
+        print(f"Error loading quiz questions: {str(e)}")
+        flash('An error occurred while loading the quiz. Please try again.', 'danger')
         return redirect(url_for('quiz'))
-
-    # Get the raw questions for this language and difficulty
-    raw_questions = QUIZ_DATA.get(language, {}).get(difficulty, [])
-
-    if not raw_questions:
-        flash(f"No {difficulty} questions available for {language} yet", 'info')
-        return redirect(url_for('quiz'))
-
-    # Shuffle questions for variety and limit to 10 questions
-    shuffled_questions = sample(raw_questions, min(len(raw_questions), 10))
-
-    # Process the questions into the format needed for the template
-    questions = _process_questions(shuffled_questions, ai_generated=False)
-
-    # Render the quiz with pre-defined questions
-    return render_template('quiz_questions.html',
-                        questions=questions,
-                        difficulty=difficulty,
-                        language=language,
-                        ai_generated=False)
 
 def _process_quiz_questions(form_data, language, difficulty, ai_generated=False):
     """
@@ -1221,7 +1229,7 @@ def _validate_answer(question_type, user_answer, correct_answer, form_data, ques
         is_correct = (user_answer == correct_answer)
 
     # Text input questions - flexible matching
-    elif question_type in ['fill_blank', 'grammar_application']:
+    elif question_type in ['fill_blank', 'fill_in_blank', 'grammar_application']:
         # For text input, do case-insensitive comparison and strip whitespace
         if user_answer and correct_answer:
             user_clean = user_answer.lower().strip()
@@ -1235,7 +1243,7 @@ def _validate_answer(question_type, user_answer, correct_answer, form_data, ques
                 is_correct = (user_flexible == correct_flexible)
 
     # Matching questions - complex validation
-    elif question_type == 'matching':
+    elif question_type == 'matching' or question_type == 'word_matching':
         # For matching questions, we need to parse the user's matches
         if user_answer:
             # Get the left and right items
@@ -1336,18 +1344,84 @@ def _validate_answer(question_type, user_answer, correct_answer, form_data, ques
 
     return is_correct, formatted_user_answer, correct_answer
 
-def _process_questions(raw_questions, ai_generated=False):
+def _process_questions(raw_questions, ai_generated=False, matching_question_index=0):
     """
     Helper function to process quiz questions into the format needed for templates.
 
     Args:
         raw_questions (list): List of question dictionaries
         ai_generated (bool): Kept for backward compatibility, always False now
+        matching_question_index (int): Index to track matching questions to prevent duplicate pairs
 
     Returns:
         list: Processed questions ready for the template
     """
     questions = []
+    
+    # Define multiple sets of pairs for different word matching questions
+    preposition_pairs = [
+        ['In', 'Location inside'], 
+        ['On', 'Surface location'],
+        ['At', 'Specific place'],
+        ['By', 'Next to']
+    ]
+    
+    animal_pairs = [
+        ['Dog', 'Puppy'], 
+        ['Cat', 'Kitten'],
+        ['Cow', 'Calf'],
+        ['Sheep', 'Lamb']
+    ]
+    
+    electronic_pairs = [
+        ['Computer', 'Processing data'],
+        ['Smartphone', 'Communication'],
+        ['Printer', 'Creating documents'],
+        ['Router', 'Internet connection']
+    ]
+    
+    country_pairs = [
+        ['USA', 'Washington DC'],
+        ['France', 'Paris'],
+        ['Japan', 'Tokyo'],
+        ['Australia', 'Canberra']
+    ]
+    
+    office_pairs = [
+        ['Stapler', 'Binding papers'],
+        ['Printer', 'Making copies'],
+        ['Computer', 'Data entry'],
+        ['Phone', 'Communication']
+    ]
+    
+    standard_pairs = [
+        ['Question', 'Answer'],
+        ['Problem', 'Solution'],
+        ['Word', 'Definition'],
+        ['Item', 'Purpose']
+    ]
+    
+    color_pairs = [
+        ['Red', 'Stop'],
+        ['Green', 'Go'],
+        ['Blue', 'Water'],
+        ['Yellow', 'Warning']
+    ]
+    
+    # Collect all pair sets into a list for easy reference
+    all_pair_sets = [
+        preposition_pairs,
+        animal_pairs,
+        electronic_pairs,
+        country_pairs,
+        office_pairs,
+        standard_pairs,
+        color_pairs
+    ]
+
+    # Track the matching question count to ensure each gets different default pairs
+    matching_count = matching_question_index
+    word_matching_count = 0
 
     for i, q in enumerate(raw_questions, 1):
         # Create base question data
@@ -1376,21 +1450,99 @@ def _process_questions(raw_questions, ai_generated=False):
             # Add explanation for question types that have it
             if 'explanation' in q and q['type'] in ['error_spotting', 'idiom_interpretation', 'cultural_nuances']:
                 question_data['explanation'] = q['explanation']
+            # Try to get explanation from metadata if available
+            elif q['type'] in ['error_spotting', 'idiom_interpretation', 'cultural_nuances'] and 'metadata' in q and q['metadata']:
+                try:
+                    metadata = json.loads(q['metadata']) if isinstance(q['metadata'], str) else q['metadata']
+                    if 'explanation' in metadata:
+                        question_data['explanation'] = metadata['explanation']
+                except:
+                    pass
 
             # Add audio file for audio recognition questions
             if q['type'] == 'audio_recognition' and 'audio_file' in q:
                 question_data['audio_file'] = q['audio_file']
 
-        elif q['type'] == 'fill_blank' or q['type'] == 'grammar_application':
+        elif q['type'] == 'fill_blank' or q['type'] == 'fill_in_blank':
             # Handle fill-in-the-blank type questions
             question_data.update({
                 'answer': q['answer'],
                 'hint': q.get('hint', '')
             })
+            
+            # Add options if they exist (for non-English languages)
+            if 'options' in q and q['options']:
+                question_data['options'] = q['options']
 
         elif q['type'] == 'matching' or q['type'] == 'word_matching':
             # Handle matching type questions
-            pairs = q['pairs']
+            pairs = []
+            
+            # Get pairs from different possible sources
+            if 'pairs' in q:
+                pairs = q['pairs']
+            elif 'metadata' in q and q['metadata']:
+                try:
+                    # Try to get pairs from metadata
+                    metadata = json.loads(q['metadata']) if isinstance(q['metadata'], str) else q['metadata']
+                    if 'pairs' in metadata:
+                        pairs = metadata['pairs']
+                except Exception as e:
+                    print(f"Error parsing metadata for pairs: {str(e)}")
+                    # If parsing fails, create empty pairs
+                    pairs = []
+            # For word_matching questions imported from Excel, we might need to get pairs from the question itself
+            if not pairs and q['type'] == 'word_matching' and 'question' in q:
+                try:
+                    # Check if the question contains pairs information like "Match these: sky=blue, grass=green"
+                    question_text = q['question']
+                    if ':' in question_text and ('=' in question_text or '→' in question_text):
+                        # Extract pairs from the question text
+                        pairs_part = question_text.split(':', 1)[1].strip()
+                        # Replace both = and → with : for consistency
+                        pairs_part = pairs_part.replace('=', ':').replace('→', ':')
+                        # Split into individual pairs
+                        pair_items = [p.strip() for p in pairs_part.split(',') if p.strip()]
+                        for pair_item in pair_items:
+                            if ':' in pair_item:
+                                left, right = pair_item.split(':', 1)
+                                pairs.append([left.strip(), right.strip()])
+                except Exception as e:
+                    print(f"Error extracting pairs from question text: {str(e)}")
+            
+            # Make sure we have pairs - use context-appropriate pairs based on question text and ensure variety
+            if not pairs:
+                question_text = q.get('question', '').lower()
+                
+                # For word_matching questions, we want to make sure each gets a unique set
+                if q['type'] == 'word_matching':
+                    # Increment the word matching counter
+                    word_matching_index = word_matching_count % len(all_pair_sets)
+                    word_matching_count += 1
+                    
+                    # Pick pairs based on question text OR use the next pair set in rotation
+                    if 'preposition' in question_text:
+                        pairs = preposition_pairs
+                    elif 'electronics' in question_text or 'devices' in question_text or 'technology' in question_text:
+                        pairs = electronic_pairs
+                    elif 'animals' in question_text or 'pets' in question_text or 'wildlife' in question_text:
+                        pairs = animal_pairs
+                    elif 'countries' in question_text or 'geography' in question_text or 'capitals' in question_text:
+                        pairs = country_pairs
+                    elif 'office' in question_text or 'workplace' in question_text:
+                        pairs = office_pairs
+                    elif 'colors' in question_text or 'colours' in question_text:
+                        pairs = color_pairs
+                    else:
+                        # If no specific match, use the next set in the rotation
+                        pairs = all_pair_sets[word_matching_index]
+                else:
+                    # For regular matching questions
+                    matching_index = matching_count % len(all_pair_sets)
+                    matching_count += 1
+                    pairs = all_pair_sets[matching_index]
+            
+            # Use these pairs for the question
             if q.get('shuffled', True):
                 left_items = [pair[0] for pair in pairs]
                 right_items = [pair[1] for pair in pairs]
@@ -2336,73 +2488,546 @@ def admin_import_questions():
         return jsonify({'error': 'Unauthorized access'}), 403
 
     try:
+        # Start by confirming we're in the route with a clear header
+        print("\n==== EXCEL IMPORT STARTED ====")
+        
         # Check if file was uploaded
         if 'excel_file' not in request.files:
+            print("No file uploaded")
             return jsonify({'error': 'No file uploaded'}), 400
         
         file = request.files['excel_file']
+        print(f"File received: {file.filename}")
         
         # Check if file is empty
         if file.filename == '':
+            print("Empty filename")
             return jsonify({'error': 'No file selected'}), 400
             
         # Check file extension
         if not file.filename.endswith(('.xlsx', '.xls')):
+            print("Invalid file format")
             return jsonify({'error': 'Invalid file format. Please upload an Excel file (.xlsx or .xls)'}), 400
 
-        # Read Excel file
+        # Get form parameters
+        question_type = request.form.get('question_type', 'multiple_choice')
+        language = request.form.get('language', 'English')
+        difficulty = request.form.get('difficulty', 'beginner')
+        
+        print(f"Import parameters: type={question_type}, language={language}, difficulty={difficulty}")
+
+        # Save the file to a temporary location
+        import tempfile
         import pandas as pd
-        df = pd.read_excel(file)
+        import os
+        
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+        file.save(temp_file.name)
+        print(f"File saved to: {temp_file.name}")
+        
+        # Try reading with different engines
+        try:
+            df = pd.read_excel(temp_file.name, engine='openpyxl')
+            print("Successfully read file with openpyxl")
+        except Exception as e:
+            print(f"openpyxl error: {str(e)}")
+            try:
+                df = pd.read_excel(temp_file.name, engine='xlrd')
+                print("Successfully read file with xlrd")
+            except Exception as e:
+                print(f"xlrd error: {str(e)}")
+                return jsonify({'error': f'Could not read Excel file: {str(e)}'}), 400
 
-        # Validate columns
-        required_columns = ['Language', 'Difficulty', 'Question', 'Options', 'Correct Answer']
-        missing_columns = [col for col in required_columns if col not in df.columns]
+        # Special handling for empty dataframes
+        if df.empty:
+            print("Excel file is empty")
+            return jsonify({'error': 'Excel file contains no data'}), 400
+        
+        # Print complete raw dataframe for debugging
+        print("\n=== RAW EXCEL DATA ===")
+        print(df.head(10))  # Print first 10 rows for debugging
+        print(f"DataFrame shape: {df.shape}")
+        
+        # Clean up the DataFrame
+        df = df.dropna(how='all')  # Drop rows that are all NaN
+        df = df.dropna(axis=1, how='all')  # Drop columns that are all NaN
+        
+        # Clean column names - handle NaN column names and standardize format
+        cleaned_columns = []
+        for i, col in enumerate(df.columns):
+            if pd.isna(col):
+                cleaned_columns.append(f"Column{i}")
+            else:
+                cleaned_columns.append(str(col).strip().title())
+        df.columns = cleaned_columns
+        
+        # Debug: Show column names
+        print(f"DataFrame columns: {list(df.columns)}")
+        
+        # Define column mappings based on question type with additional flexibility
+        column_mappings = {
+            'question': ['question', 'questions', 'prompt', 'sentence', 'fill', 'phrase start', 'phrase_start', 'start', 'beginning'],
+            'answer': ['answer', 'answers', 'correct answer', 'correct', 'correct answers', 'solution', 'answers', 'blanks', 'correct completion', 'completion'],
+            'options': ['options', 'choices', 'possible answers', 'option', 'choice', 'completions', 'possible completions'],
+            'hint': ['hint', 'hints', 'clue', 'clues', 'help', 'help text'],
+            'explanation': ['explanation', 'explanations', 'reason', 'reasons', 'feedback'],
+            'pairs': ['pairs', 'word pairs', 'matching pairs', 'word matching', 'match', 'matching']
+        }
+
+        # Print raw column values for better debugging visibility
+        print("\n=== SAMPLE DATA ===")
+        for col in df.columns:
+            values = df[col].head(3).tolist()
+            print(f"Column '{col}': {values}")
+
+        # Create a mapping from standard names to actual column names
+        standard_to_actual = {}
+        for standard, synonyms in column_mappings.items():
+            for col in df.columns:
+                if col.lower() in [s.lower() for s in synonyms]:
+                    standard_to_actual[standard] = col
+                    print(f"Mapped '{standard}' to column '{col}'")
+                    break
+        
+        print(f"Column mapping: {standard_to_actual}")
+        
+        # Special case: If we can't find "options" for fill-in-blank, that's OK for English
+        if question_type == 'fill_in_blank' and language == 'English':
+            required_columns = ['question', 'answer']
+        # For all other question types, determine required columns
+        elif question_type == 'multiple_choice':
+            required_columns = ['question', 'options', 'answer']
+        elif question_type == 'word_matching':
+            required_columns = ['question', 'pairs']
+        elif question_type == 'fill_in_blank':  # Non-English
+            required_columns = ['question', 'answer', 'options']
+        elif question_type == 'phrase_completion':
+            # Phrase completion needs question (phrase start), options, and answer (correct completion)
+            required_columns = ['question', 'options', 'answer']
+        elif question_type == 'error_spotting':
+            # Error spotting needs question, options, answer, and explanation
+            required_columns = ['question', 'options', 'answer', 'explanation']
+        elif question_type == 'context_responses':
+            # Context responses needs question, options, and answer
+            required_columns = ['question', 'options', 'answer']
+        elif question_type == 'cultural_nuances':
+            # Cultural nuances needs question, options, answer, and explanation
+            required_columns = ['question', 'options', 'answer', 'explanation']
+        elif question_type == 'idiom_interpretation':
+            # Idiom interpretation needs question, options, answer, and explanation
+            required_columns = ['question', 'options', 'answer', 'explanation']
+        elif question_type == 'complex_rephrasing':
+            # Complex rephrasing needs question, options, and answer
+            required_columns = ['question', 'options', 'answer']
+        else:
+            required_columns = ['question', 'answer']
+        
+        # Check if we have all required columns
+        missing_columns = []
+        for col in required_columns:
+            if col not in standard_to_actual:
+                missing_columns.append(col)
+        
         if missing_columns:
-            return jsonify({'error': f'Missing columns: {", ".join(missing_columns)}'}), 400
-
-        # Connect to database
+            print(f"Missing required columns: {missing_columns}")
+            # Special case: If we're only missing "options" for non-English fill-in-blank,
+            # we'll create default options from the answer
+            if question_type == 'fill_in_blank' and missing_columns == ['options']:
+                print("Missing 'options' column for fill-in-blank, but will continue with just answer")
+                # Don't return an error, we'll handle this case specially
+            else:
+                return jsonify({'error': f'Missing required columns: {", ".join(missing_columns)}'}), 400
+        
+        # Process the questions
         with get_db_connection() as conn:
             success_count = 0
             error_count = 0
 
-            # Process each row
             for index, row in df.iterrows():
                 try:
-                    # Validate difficulty
-                    if row['Difficulty'].lower() not in ['beginner', 'intermediate', 'advanced']:
-                        continue
-
-                    # Process options - split by newline or semicolon
-                    options = [opt.strip() for opt in str(row['Options']).replace('\n', ';').split(';') if opt.strip()]
+                    # Get basic values needed for all question types
+                    question_col = standard_to_actual.get('question')
+                    answer_col = standard_to_actual.get('answer')
                     
-                    # Skip if less than 2 options
-                    if len(options) < 2:
+                    if not question_col or not answer_col:
+                        print(f"Row {index+1}: Missing question or answer column mapping")
+                        error_count += 1
                         continue
 
-                    # Skip if correct answer not in options
-                    if str(row['Correct Answer']).strip() not in options:
+                    # Safely get values, handling NaN and empty strings
+                    question = str(row[question_col]).strip() if not pd.isna(row[question_col]) else ""
+                    answer = str(row[answer_col]).strip() if not pd.isna(row[answer_col]) else ""
+                    
+                    # Skip if both question and answer are empty
+                    if not question and not answer:
+                        print(f"Row {index+1}: Skipping - Both question and answer are empty")
+                        error_count += 1
                         continue
 
-                    # Insert question into database
-                    conn.execute('''
-                        INSERT INTO quiz_questions 
-                        (language, difficulty, question, options, answer)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (
-                        str(row['Language']).strip(),
-                        str(row['Difficulty']).lower().strip(),
-                        str(row['Question']).strip(),
-                        json.dumps(options),
-                        str(row['Correct Answer']).strip()
-                    ))
-                    success_count += 1
+                    # If only answer is empty but question exists, try to infer the answer
+                    if question and not answer:
+                        # Look for blanks in the question (like "The sky is ____")
+                        if '___' in question or '__' in question or '_' in question:
+                            print(f"Row {index+1}: Warning - Empty answer but question has blanks, importing anyway")
+                            # Don't skip this row, the teacher might fill in the answers later
+                        else:
+                            print(f"Row {index+1}: Skipping - Empty answer")
+                            error_count += 1
+                            continue
+
+                    # If only question is empty but answer exists, skip
+                    if not question and answer:
+                        print(f"Row {index+1}: Skipping - Empty question")
+                        error_count += 1
+                        continue
+                    
+                    print(f"Row {index+1}: Processing question: {question[:50]}...")
+                    print(f"  Answer: {answer[:30]}...")
+
+                    if question_type == 'fill_in_blank':
+                        # Get hint if available
+                        hint = ""
+                        if 'hint' in standard_to_actual:
+                            hint_col = standard_to_actual['hint']
+                            hint = str(row[hint_col]).strip() if not pd.isna(row[hint_col]) else ""
+                            print(f"  Hint: {hint[:30]}...")
+                        
+                        # For English, we don't need options
+                        if language == 'English':
+                            conn.execute('''
+                                INSERT INTO quiz_questions 
+                                (language, difficulty, question, options, answer, question_type, metadata)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ''', (
+                                language,
+                                difficulty,
+                                question,
+                                json.dumps([]),  # Empty options
+                                answer,
+                                'fill_in_blank',
+                                json.dumps({"hint": hint})
+                            ))
+                            print(f"  SUCCESS: English fill-in-blank question added")
+                            success_count += 1
+                        else:
+                            # For non-English, we need options - either from column or generated
+                            options = []
+                            if 'options' in standard_to_actual:
+                                options_col = standard_to_actual['options']
+                                options_text = str(row[options_col]).strip() if not pd.isna(row[options_col]) else ""
+                                if options_text:
+                                    options = [opt.strip() for opt in options_text.replace('\n', ';').replace(',', ';').split(';') if opt.strip()]
+                                    print(f"  Found {len(options)} options from column")
+                            if not options:
+                                print("  No options found, generating default options")
+                                options = [answer, "Option A", "Option B", "Option C"]
+                            if answer not in options:
+                                options.append(answer)
+                            while len(options) < 2:
+                                options.append(f"Option {len(options) + 1}")
+                            conn.execute('''
+                                INSERT INTO quiz_questions 
+                                (language, difficulty, question, options, answer, question_type, metadata)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ''', (
+                                language,
+                                difficulty,
+                                question,
+                                json.dumps(options),
+                                answer,
+                                'fill_in_blank',
+                                json.dumps({"hint": hint})
+                            ))
+                            print(f"  SUCCESS: Non-English fill-in-blank question added")
+                            success_count += 1
+
+                    elif question_type == 'multiple_choice':
+                        if 'options' not in standard_to_actual:
+                            print(f"  ERROR: Options column required for multiple choice")
+                            error_count += 1
+                            continue
+                        options_col = standard_to_actual['options']
+                        options_text = str(row[options_col]).strip() if not pd.isna(row[options_col]) else ""
+                        options = []
+                        if options_text:
+                            options = [opt.strip() for opt in options_text.replace('\n', ';').replace(',', ';').split(';') if opt.strip()]
+                        if answer not in options:
+                            options.append(answer)
+                        while len(options) < 2:
+                            options.append(f"Option {len(options) + 1}")
+                        conn.execute('''
+                            INSERT INTO quiz_questions 
+                            (language, difficulty, question, options, answer, question_type)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ''', (
+                            language,
+                            difficulty,
+                            question,
+                            json.dumps(options),
+                            answer,
+                            'multiple_choice'
+                        ))
+                        print(f"  SUCCESS: Multiple choice question added")
+                        success_count += 1
+
+                    elif question_type == 'word_matching':
+                        if 'pairs' not in standard_to_actual:
+                            print(f"  ERROR: Pairs column required for word matching")
+                            error_count += 1
+                            continue
+                        pairs_col = standard_to_actual['pairs']
+                        pairs_text = str(row[pairs_col]).strip() if not pd.isna(row[pairs_col]) else ""
+                        pairs = []
+                        if pairs_text:
+                            pair_items = [p.strip() for p in pairs_text.split(';') if p.strip()]
+                            for pair_item in pair_items:
+                                if ':' in pair_item:
+                                    left, right = pair_item.split(':', 1)
+                                    pairs.append([left.strip(), right.strip()])
+                        if len(pairs) < 2:
+                            print(f"  ERROR: Need at least 2 pairs for word matching")
+                            error_count += 1
+                            continue
+                        conn.execute('''
+                            INSERT INTO quiz_questions 
+                            (language, difficulty, question, options, answer, question_type, metadata)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            language,
+                            difficulty,
+                            question,
+                            json.dumps([]),  # Empty options
+                            "",  # Empty answer since we use pairs
+                            'word_matching',
+                            json.dumps({"pairs": pairs})
+                        ))
+                        print(f"  SUCCESS: Word matching question added with {len(pairs)} pairs")
+                        success_count += 1
+
+                    elif question_type == 'phrase_completion':
+                        if 'options' not in standard_to_actual:
+                            print(f"  ERROR: Options column required for phrase completion")
+                            error_count += 1
+                            continue
+                        options_col = standard_to_actual['options']
+                        options_text = str(row[options_col]).strip() if not pd.isna(row[options_col]) else ""
+                        options = []
+                        if options_text:
+                            options = [opt.strip() for opt in options_text.replace('\n', ';').replace(',', ';').split(';') if opt.strip()]
+                            print(f"  Found {len(options)} completions")
+                        if answer not in options:
+                            options.append(answer)
+                            print(f"  Added correct completion to options: {answer}")
+                        while len(options) < 2:
+                            options.append(f"Completion {len(options) + 1}")
+                        conn.execute('''
+                            INSERT INTO quiz_questions 
+                            (language, difficulty, question, options, answer, question_type)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ''', (
+                            language,
+                            difficulty,
+                            question,  # Phrase Start
+                            json.dumps(options),  # Possible completions
+                            answer,    # Correct completion
+                            'phrase_completion'
+                        ))
+                        print(f"  SUCCESS: Phrase completion question added")
+                        success_count += 1
+
+                    elif question_type == 'error_spotting':
+                        if 'options' not in standard_to_actual:
+                            print(f"  ERROR: Options column required for error spotting")
+                            error_count += 1
+                            continue
+                        explanation = ""
+                        if 'explanation' in standard_to_actual:
+                            explanation_col = standard_to_actual['explanation']
+                            explanation = str(row[explanation_col]).strip() if not pd.isna(row[explanation_col]) else ""
+                            print(f"  Found explanation: {explanation[:30]}...")
+                        else:
+                            print(f"  No explanation column found, continuing with empty explanation")
+                        options_col = standard_to_actual['options']
+                        options_text = str(row[options_col]).strip() if not pd.isna(row[options_col]) else ""
+                        options = []
+                        if options_text:
+                            options = [opt.strip() for opt in options_text.replace('\n', ';').replace(',', ';').split(';') if opt.strip()]
+                            print(f"  Found {len(options)} options")
+                        if answer not in options:
+                            options.append(answer)
+                            print(f"  Added correct answer to options: {answer}")
+                        while len(options) < 2:
+                            options.append(f"Option {len(options) + 1}")
+                        conn.execute('''
+                            INSERT INTO quiz_questions 
+                            (language, difficulty, question, options, answer, question_type, metadata)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            language,
+                            difficulty,
+                            question,
+                            json.dumps(options),
+                            answer,
+                            'error_spotting',
+                            json.dumps({"explanation": explanation})
+                        ))
+                        print(f"  SUCCESS: Error spotting question added with explanation")
+                        success_count += 1
+
+                    elif question_type == 'context_responses':
+                        if 'options' not in standard_to_actual:
+                            print(f"  ERROR: Options column required for context responses")
+                            error_count += 1
+                            continue
+                        options_col = standard_to_actual['options']
+                        options_text = str(row[options_col]).strip() if not pd.isna(row[options_col]) else ""
+                        options = []
+                        if options_text:
+                            options = [opt.strip() for opt in options_text.replace('\n', ';').replace(',', ';').split(';') if opt.strip()]
+                            print(f"  Found {len(options)} responses")
+                        if answer not in options:
+                            options.append(answer)
+                            print(f"  Added correct response to options: {answer}")
+                        while len(options) < 2:
+                            options.append(f"Response {len(options) + 1}")
+                        conn.execute('''
+                            INSERT INTO quiz_questions 
+                            (language, difficulty, question, options, answer, question_type)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ''', (
+                            language,
+                            difficulty,
+                            question,
+                            json.dumps(options),
+                            answer,
+                            'context_responses'
+                        ))
+                        print(f"  SUCCESS: Context responses question added")
+                        success_count += 1
+
+                    elif question_type == 'cultural_nuances':
+                        if 'options' not in standard_to_actual:
+                            print(f"  ERROR: Options column required for cultural nuances")
+                            error_count += 1
+                            continue
+                        explanation = ""
+                        if 'explanation' in standard_to_actual:
+                            explanation_col = standard_to_actual['explanation']
+                            explanation = str(row[explanation_col]).strip() if not pd.isna(row[explanation_col]) else ""
+                            print(f"  Found explanation: {explanation[:30]}...")
+                        else:
+                            print(f"  No explanation column found, continuing with empty explanation")
+                        options_col = standard_to_actual['options']
+                        options_text = str(row[options_col]).strip() if not pd.isna(row[options_col]) else ""
+                        options = []
+                        if options_text:
+                            options = [opt.strip() for opt in options_text.replace('\n', ';').replace(',', ';').split(';') if opt.strip()]
+                            print(f"  Found {len(options)} options")
+                        if answer not in options:
+                            options.append(answer)
+                            print(f"  Added correct answer to options: {answer}")
+                        while len(options) < 2:
+                            options.append(f"Option {len(options) + 1}")
+                        conn.execute('''
+                            INSERT INTO quiz_questions 
+                            (language, difficulty, question, options, answer, question_type, metadata)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            language,
+                            difficulty,
+                            question,
+                            json.dumps(options),
+                            answer,
+                            'cultural_nuances',
+                            json.dumps({"explanation": explanation})
+                        ))
+                        print(f"  SUCCESS: Cultural nuances question added with explanation")
+                        success_count += 1
+
+                    elif question_type == 'idiom_interpretation':
+                        if 'options' not in standard_to_actual:
+                            print(f"  ERROR: Options column required for idiom interpretation")
+                            error_count += 1
+                            continue
+                        explanation = ""
+                        if 'explanation' in standard_to_actual:
+                            explanation_col = standard_to_actual['explanation']
+                            explanation = str(row[explanation_col]).strip() if not pd.isna(row[explanation_col]) else ""
+                            print(f"  Found explanation: {explanation[:30]}...")
+                        else:
+                            print(f"  No explanation column found, continuing with empty explanation")
+                        options_col = standard_to_actual['options']
+                        options_text = str(row[options_col]).strip() if not pd.isna(row[options_col]) else ""
+                        options = []
+                        if options_text:
+                            options = [opt.strip() for opt in options_text.replace('\n', ';').replace(',', ';').split(';') if opt.strip()]
+                            print(f"  Found {len(options)} options")
+                        if answer not in options:
+                            options.append(answer)
+                            print(f"  Added correct answer to options: {answer}")
+                        while len(options) < 2:
+                            options.append(f"Option {len(options) + 1}")
+                        conn.execute('''
+                            INSERT INTO quiz_questions 
+                            (language, difficulty, question, options, answer, question_type, metadata)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            language,
+                            difficulty,
+                            question,
+                            json.dumps(options),
+                            answer,
+                            'idiom_interpretation',
+                            json.dumps({"explanation": explanation})
+                        ))
+                        print(f"  SUCCESS: Idiom interpretation question added with explanation")
+                        success_count += 1
+
+                    elif question_type == 'complex_rephrasing':
+                        if 'options' not in standard_to_actual:
+                            print(f"  ERROR: Options column required for complex rephrasing")
+                            error_count += 1
+                            continue
+                        options_col = standard_to_actual['options']
+                        options_text = str(row[options_col]).strip() if not pd.isna(row[options_col]) else ""
+                        options = []
+                        if options_text:
+                            options = [opt.strip() for opt in options_text.replace('\n', ';').replace(',', ';').split(';') if opt.strip()]
+                            print(f"  Found {len(options)} rephrasings")
+                        if answer not in options:
+                            options.append(answer)
+                            print(f"  Added correct rephrasing to options: {answer}")
+                        while len(options) < 2:
+                            options.append(f"Rephrasing {len(options) + 1}")
+                        conn.execute('''
+                            INSERT INTO quiz_questions 
+                            (language, difficulty, question, options, answer, question_type)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ''', (
+                            language,
+                            difficulty,
+                            question,
+                            json.dumps(options),
+                            answer,
+                            'complex_rephrasing'
+                        ))
+                        print(f"  SUCCESS: Complex rephrasing question added")
+                        success_count += 1
+
                 except Exception as e:
+                    print(f"  ERROR processing row {index+1}: {str(e)}")
                     error_count += 1
-                    print(f"Error processing row {index + 2}: {str(e)}")
-
+            
+            # Commit changes
             conn.commit()
 
-        # Reload quiz data
+        # Clean up temp file
+        try:
+            os.unlink(temp_file.name)
+        except:
+            pass
+        
+        # Update quiz data from database
         load_quiz_data()
 
         # Return results
@@ -2410,15 +3035,19 @@ def admin_import_questions():
             message = f"Successfully imported {success_count} questions"
             if error_count > 0:
                 message += f" ({error_count} failed)"
+            print(f"IMPORT COMPLETE: {message}")
             return jsonify({
                 'success': True,
                 'message': message
             }), 200
         else:
-            return jsonify({'error': 'No valid questions found in the file'}), 400
+            print("IMPORT FAILED: No valid questions found in file")
+            return jsonify({'error': 'No valid questions found in file'}), 400
 
     except Exception as e:
-        print(f"Error importing questions: {str(e)}")
+        import traceback
+        print(f"ERROR: Exception during import: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({'error': f'Error importing questions: {str(e)}'}), 500
 
 @app.route('/admin/delete_questions', methods=['POST'])
@@ -2629,6 +3258,74 @@ def chat():
         print(f"Error in chat route: {str(e)}")
         print(f"Full traceback: {traceback.format_exc()}")
         return jsonify({'error': 'An error occurred processing your message'}), 500
+
+# Define valid question types as a constant
+VALID_QUESTION_TYPES: List[str] = [
+    'multiple_choice', 'word_matching', 'fill_in_blank',
+    'phrase_completion', 'error_spotting', 'context_responses',
+    'idiom_interpretation', 'cultural_nuances', 'complex_rephrasing'
+]
+
+@app.route('/download_template')
+def download_template():
+    """
+    Download a template Excel file for question import.
+    
+    Returns:
+        Flask response: Either a file download or a redirect with flash message.
+        
+    Query Parameters:
+        type (str): The type of question template to download.
+                    Must be one of the valid question types.
+    """
+    # Check if user is logged in as admin
+    if 'admin' not in session:
+        flash('Please log in as admin to access this feature.', 'error')
+        return redirect(url_for('admin_login'))
+    
+    try:
+        # Get and validate question type
+        question_type = request.args.get('type', 'multiple_choice')
+        if question_type not in VALID_QUESTION_TYPES:
+            flash(f'Invalid question type. Must be one of: {", ".join(VALID_QUESTION_TYPES)}', 'error')
+            return redirect(url_for('admin_dashboard'))
+
+        # Ensure the templates directory exists
+        templates_dir = Path(os.path.dirname(os.path.abspath(__file__))) / 'static' / 'templates'
+        templates_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Construct template file path
+        template_path = templates_dir / f'{question_type}_template.xlsx'
+
+        # Check if the file exists
+        if not template_path.exists():
+            flash(f'Template file for {question_type} not found. Please contact support.', 'error')
+            return redirect(url_for('admin_dashboard'))
+
+        return send_file(
+            template_path,
+            as_attachment=True,
+            download_name=f'{question_type}_template.xlsx',
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        flash(f'Error downloading template: {str(e)}', 'error')
+        return redirect(url_for('admin_dashboard'))
+
+def get_default_questions(language, difficulty):
+    """
+    Returns a list of default questions for the given language and difficulty.
+    This is a fallback if no questions are found in the database.
+    """
+    return [
+        {
+            'text': f'Default question for {language} ({difficulty})',
+            'type': 'multiple_choice',
+            'options': ['Option 1', 'Option 2', 'Option 3', 'Option 4'],
+            'answer': 'Option 1',
+            'points': 10
+        }
+    ]
 
 if __name__ == '__main__':
     """
