@@ -36,7 +36,12 @@ def initialize_database():
                 bio TEXT,                              -- User profile bio
                 urls TEXT,                             -- Social media links
                 profile_picture TEXT,                  -- Profile picture filename
-                dark_mode INTEGER DEFAULT 0            -- UI theme preference
+                dark_mode INTEGER DEFAULT 0,           -- UI theme preference
+                name TEXT,                             -- Full name
+                phone TEXT,                            -- Phone number
+                location TEXT,                         -- Location/address
+                website TEXT,                          -- Personal website
+                avatar TEXT                            -- Selected avatar image
             )
         ''')
         print("✅ Table 'users' created/verified!")
@@ -118,12 +123,61 @@ def initialize_database():
         ''')
         print("✅ Table 'chat_history' created/verified!")
 
+        # Chat sessions table - organizes chat messages into sessions
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                session_id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                language TEXT NOT NULL,
+                started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_message_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
+        print("✅ Table 'chat_sessions' created/verified!")
+
+        # Chat messages table - stores individual messages in a session
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                message TEXT NOT NULL,
+                bot_response TEXT NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES chat_sessions (session_id)
+            )
+        ''')
+        print("✅ Table 'chat_messages' created/verified!")
+
+        # Quiz questions table - stores all quiz questions
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS quiz_questions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                language TEXT NOT NULL,
+                difficulty TEXT NOT NULL,
+                question TEXT NOT NULL,
+                options TEXT NOT NULL,  -- Stored as JSON
+                answer TEXT NOT NULL,
+                question_type TEXT DEFAULT 'multiple_choice',
+                points INTEGER DEFAULT 10,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        print("✅ Table 'quiz_questions' created/verified!")
+
         # --- Ensure Required Columns Exist ---
         # Check and add any missing columns to users table
         for column, definition in [
             ("bio", "TEXT"),
             ("urls", "TEXT"),
-            ("dark_mode", "INTEGER DEFAULT 0")
+            ("dark_mode", "INTEGER DEFAULT 0"),
+            ("name", "TEXT"),
+            ("phone", "TEXT"),
+            ("location", "TEXT"),
+            ("website", "TEXT"),
+            ("avatar", "TEXT"),
+            ("timezone", "TEXT"),
+            ("datetime_format", "TEXT")
         ]:
             try:
                 conn.execute(f'ALTER TABLE users ADD COLUMN {column} {definition};')
