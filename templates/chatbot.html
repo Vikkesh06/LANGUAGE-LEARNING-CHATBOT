@@ -793,6 +793,22 @@
                         Hello! I'm your AI language tutor. Choose a language and start chatting with me to practice!
                     </div>
                 </div>
+                <!-- Pronunciation Checker UI -->
+                <div class="pronunciation-checker" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                    <button id="mic-btn" title="Speak to check pronunciation" style="font-size: 1.3rem; padding: 8px 14px; border-radius: 8px; border: none; background: #4a90e2; color: #fff; cursor: pointer;">🎤 Speak</button>
+                    <span id="transcript" style="min-width: 120px; color: #7fc9ff;"></span>
+                    <span id="pronunciation-feedback" style="margin-left: 10px; color: #ffb74d;"></span>
+                </div>
+                <!-- Live Speech Transcript Area -->
+                <div id="live-speech-transcript" style="width: 100%; min-height: 30px; margin-bottom: 10px; background: #222; color: #fff; border-radius: 6px; padding: 8px; font-size: 1.05rem;"></div>
+                <!-- End Live Speech Transcript Area -->
+                <!-- Image Upload for Chatbot -->
+                <div class="chatbot-image-upload" style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                    <input type="file" id="chatbot-image-input" accept="image/*" style="color: #fff;">
+                    <img id="chatbot-image-preview" src="" alt="Image Preview" style="max-width: 80px; max-height: 80px; display: none; border-radius: 8px; border: 1px solid #555; background: #222;" />
+                    <button id="remove-image-btn" style="display:none; background:#e74c3c; color:#fff; border:none; border-radius:6px; padding:4px 10px; cursor:pointer;">Remove</button>
+                </div>
+                <!-- End Image Upload for Chatbot -->
                 <div class="chat-input">
                     <input type="text" id="message-input" placeholder="Type your message here...">
                     <button onclick="sendMessage()">Send</button>
@@ -947,19 +963,25 @@
 
         function sendMessage() {
             const message = messageInput.value.trim();
-            if (!message || loadingSession) return;
+            if (!message && !selectedImageFile) return;
             addMessage(message, true);
             messageInput.value = '';
+
+            // Use FormData for text + image
+            const formData = new FormData();
+            formData.append('message', message);
+            formData.append('language', languageSelect.value);
+            formData.append('session_id', currentSessionId || '');
+            if (selectedImageFile) {
+                formData.append('image', selectedImageFile);
+                console.log("Image file appended:", selectedImageFile);
+            } else {
+                console.log("No image file selected.");
+            }
+
             fetch('/chat', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    message: message,
-                    language: languageSelect.value,
-                    session_id: currentSessionId
-                })
+                body: formData
             })
             .then(response => response.json())
             .then(data => {
@@ -967,19 +989,26 @@
                     addMessage({
                         response: data.response,
                         translation: data.translation
-                    }); // Add bot message with dark theme
+                    });
                     if (data.session_id) {
                         currentSessionId = data.session_id;
                     }
-                    loadSessions(currentSessionId); // Refresh session list and highlight
+                    loadSessions(currentSessionId);
                 } else if (data.error) {
-                    addMessage('Error: ' + data.error); // Add error message with dark theme
+                    addMessage('Error: ' + data.error);
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
                 addMessage('Sorry, there was an error processing your message.');
             });
+
+            // Reset image after sending
+            imageInput.value = '';
+            imagePreview.src = '';
+            imagePreview.style.display = 'none';
+            removeImageBtn.style.display = 'none';
+            selectedImageFile = null;
         }
 
         function startNewChat() {
@@ -1258,6 +1287,199 @@
             reviewMode = false;
             loadStudyList();
         }
+
+        // --- Pronunciation Checker JS ---
+        const micBtn = document.getElementById('mic-btn');
+        const transcriptDiv = document.getElementById('transcript');
+        const feedbackDiv = document.getElementById('pronunciation-feedback');
+        const liveTranscriptDiv = document.getElementById('live-speech-transcript');
+        let recognition;
+        let lastExpectedPhrase = '';
+        let hasRestarted = false; // Prevent infinite restart loops
+        let listeningIndicator = null;
+
+        // Add a visual indicator for listening
+        function showListeningIndicator() {
+            if (!listeningIndicator) {
+                listeningIndicator = document.createElement('span');
+                listeningIndicator.id = 'listening-indicator';
+                listeningIndicator.style.marginLeft = '10px';
+                listeningIndicator.style.color = '#4a90e2';
+                listeningIndicator.textContent = '🎤 Listening...';
+                micBtn.parentNode.appendChild(listeningIndicator);
+            }
+        }
+        function hideListeningIndicator() {
+            if (listeningIndicator && listeningIndicator.parentNode) {
+                listeningIndicator.parentNode.removeChild(listeningIndicator);
+                listeningIndicator = null;
+            }
+        }
+
+        // Helper: get the last bot message (target language response)
+        function getLastBotPhrase() {
+            const botMessages = document.querySelectorAll('.bot-message .target-language-response');
+            if (botMessages.length > 0) {
+                // Get the last bot message's text
+                return botMessages[botMessages.length - 1].innerText.trim();
+            }
+            return '';
+        }
+
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'en-US'; // Default, will set dynamically
+            recognition.interimResults = true; // Enable interim results for live transcript
+            recognition.maxAlternatives = 1;
+            recognition.continuous = false; // Only listen for one phrase at a time
+
+            micBtn.onclick = () => {
+                // Set language based on selector
+                const lang = languageSelect.value;
+                // Map language to BCP-47 code
+                const langMap = {
+                    english: 'en-US',
+                    spanish: 'es-ES',
+                    french: 'fr-FR',
+                    german: 'de-DE',
+                    italian: 'it-IT',
+                    portuguese: 'pt-PT',
+                    chinese: 'zh-CN',
+                    japanese: 'ja-JP',
+                    korean: 'ko-KR'
+                };
+                recognition.lang = langMap[lang] || 'en-US';
+                transcriptDiv.textContent = 'Listening...';
+                feedbackDiv.textContent = '';
+                liveTranscriptDiv.textContent = '';
+                hasRestarted = false;
+                showListeningIndicator();
+                recognition.start();
+            };
+
+            recognition.onaudiostart = function() {
+                console.log('Audio capturing started');
+            };
+            recognition.onsoundstart = function() {
+                console.log('Sound has been detected');
+            };
+            recognition.onspeechstart = function() {
+                console.log('Speech has been detected');
+            };
+            recognition.onspeechend = function() {
+                console.log('Speech has stopped being detected');
+            };
+            recognition.onsoundend = function() {
+                console.log('Sound has stopped being detected');
+            };
+            recognition.onaudioend = function() {
+                console.log('Audio capturing ended');
+            };
+            recognition.onend = function() {
+                console.log('Recognition ended');
+                hideListeningIndicator();
+            };
+
+            recognition.onresult = (event) => {
+                hideListeningIndicator();
+                let interim = '';
+                let final = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        final += event.results[i][0].transcript;
+                    } else {
+                        interim += event.results[i][0].transcript;
+                    }
+                }
+                // Show live transcript (final + interim)
+                liveTranscriptDiv.textContent = final + interim;
+                // Show final transcript in the old area for compatibility
+                if (final) {
+                    transcriptDiv.textContent = `You said: ${final}`;
+                }
+                // Only check pronunciation if we have a final result
+                if (final) {
+                    // Get the last bot phrase (expected phrase)
+                    const expected = getLastBotPhrase();
+                    lastExpectedPhrase = expected;
+                    if (expected) {
+                        // Send to backend for pronunciation/similarity check
+                        fetch('/check_pronunciation', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                expected: expected,
+                                spoken: final,
+                                language: languageSelect.value
+                            })
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            feedbackDiv.textContent = data.feedback || `Similarity: ${data.similarity}%`;
+                        })
+                        .catch(() => {
+                            feedbackDiv.textContent = 'Error checking pronunciation.';
+                        });
+                    } else {
+                        feedbackDiv.textContent = 'Say the last phrase shown by the bot!';
+                    }
+                }
+            };
+
+            recognition.onerror = (event) => {
+                hideListeningIndicator();
+                console.log('Speech recognition error:', event.error);
+                if (event.error === 'no-speech' && !hasRestarted) {
+                    transcriptDiv.textContent = 'No speech detected, please try again...';
+                    hasRestarted = true;
+                    setTimeout(() => {
+                        showListeningIndicator();
+                        recognition.start();
+                    }, 500);
+                } else if (event.error === 'not-allowed' || event.error === 'denied') {
+                    transcriptDiv.textContent = 'Microphone access denied. Please allow microphone permissions in your browser.';
+                    feedbackDiv.textContent = '';
+                } else {
+                    transcriptDiv.textContent = 'Error: ' + event.error;
+                    feedbackDiv.textContent = '';
+                }
+            };
+        } else {
+            micBtn.disabled = true;
+            transcriptDiv.textContent = 'Speech recognition not supported.';
+        }
+        // --- End Pronunciation Checker JS ---
+
+        // Image upload preview and remove logic
+        const imageInput = document.getElementById('chatbot-image-input');
+        const imagePreview = document.getElementById('chatbot-image-preview');
+        const removeImageBtn = document.getElementById('remove-image-btn');
+        let selectedImageFile = null;
+        imageInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                selectedImageFile = this.files[0];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    imagePreview.src = e.target.result;
+                    imagePreview.style.display = 'block';
+                    removeImageBtn.style.display = 'inline-block';
+                };
+                reader.readAsDataURL(this.files[0]);
+            } else {
+                imagePreview.src = '';
+                imagePreview.style.display = 'none';
+                removeImageBtn.style.display = 'none';
+                selectedImageFile = null;
+            }
+        });
+        removeImageBtn.addEventListener('click', function() {
+            imageInput.value = '';
+            imagePreview.src = '';
+            imagePreview.style.display = 'none';
+            removeImageBtn.style.display = 'none';
+            selectedImageFile = null;
+        });
     </script>
 </body>
 </html>
