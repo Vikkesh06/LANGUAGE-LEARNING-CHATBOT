@@ -133,32 +133,8 @@
             box-shadow: none;
         }
 
-        .progress-container {
-            margin-bottom: 2rem;
-        }
-
-        .progress-text {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-        }
-
-        .progress-bar {
-            height: 8px;
-            border-radius: 4px;
-            background-color: #e9ecef;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            border-radius: 4px;
-            background: linear-gradient(90deg, var(--accent-color), var(--primary-color));
-            transition: width 0.3s ease;
-        }
-
         .home-btn {
-            position: absolute;
+            position: fixed;
             top: 1.5rem;
             left: 1.5rem;
             background: var(--primary-color);
@@ -171,6 +147,7 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            z-index: 1000;
         }
 
         .home-btn:hover {
@@ -179,33 +156,12 @@
             transform: translateY(-2px);
         }
 
-        /* Timer styles */
-        .timer {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: white;
-            padding: 0.5rem 1rem;
-            border-radius: 50px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            font-weight: 600;
-            z-index: 100;
-        }
-
-        .timer.warning {
-            color: #ffc107;
-        }
-
-        .timer.danger {
-            color: #dc3545;
-            animation: pulse 1s infinite;
-        }
-
-        /* Matching question styles */
+        /* Word Matching styles */
         .matching-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1rem;
+            margin-bottom: 1rem;
         }
 
         .matching-column {
@@ -328,56 +284,6 @@
             display: none;
         }
 
-        /* Image option styles */
-        .image-option {
-            font-size: 2rem;
-            justify-content: center;
-        }
-
-        /* Sentence construction styles */
-        .sentence-construction {
-            margin-top: 1rem;
-        }
-
-        .word-bank {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            min-height: 50px;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border: 1px dashed #dee2e6;
-        }
-
-        .sentence-area {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            min-height: 50px;
-            padding: 1rem;
-            background: #e9ecef;
-            border-radius: 8px;
-            border: 2px solid var(--accent-color);
-            margin-bottom: 1rem;
-        }
-
-        .word-item {
-            padding: 0.5rem 1rem;
-            background: white;
-            border-radius: 4px;
-            border: 1px solid #dee2e6;
-            cursor: pointer;
-            transition: all 0.2s;
-            user-select: none;
-        }
-
-        .word-item:hover {
-            background: #e2f0fd;
-            transform: translateY(-2px);
-        }
-
         /* Error spotting styles */
         .error-sentence {
             font-style: italic;
@@ -388,964 +294,235 @@
             margin-bottom: 1rem;
         }
 
-        /* Audio recognition styles */
-        .audio-recognition audio {
-            width: 100%;
-            margin-bottom: 1rem;
+        /* Translation styles */
+        .translate-btn {
+            padding: 0.18rem 0.8rem;
+            font-size: 0.93rem;
+            border-radius: 7px;
+            background: #eaf1fb;
+            color: #3b5998;
+            border: 1px solid #3b5998;
+            min-width: unset;
+            width: auto;
         }
 
-        /* Motivational messages */
-        .motivation-message {
-            text-align: center;
-            margin: 1rem 0;
-            padding: 0.75rem;
-            border-radius: 8px;
-            background: rgba(67, 97, 238, 0.1);
-            color: var(--primary-color);
-            font-weight: 500;
-            animation: fadeIn 0.5s ease-in-out;
+        .translate-btn:hover {
+            background: #3b5998;
+            color: white;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        @media (max-width: 768px) {
+            .home-btn {
+                position: static;
+                margin-bottom: 1rem;
+                display: inline-flex;
+            }
         }
     </style>
 </head>
-<body>
-    <a href="{{ url_for('dashboard') }}" class="home-btn">
-        <i class="fas fa-arrow-left"></i> Dashboard
+<body style="background: #f8f9fa;">
+    <a href="{{ url_for('quiz_select') }}" class="btn btn-outline-primary" style="position: fixed; top: 2rem; left: 2rem; z-index: 1000; border-radius: 8px; font-weight: 500; padding: 0.5rem 1.2rem;">
+        <i class="fas fa-arrow-left"></i> Back to Quiz Main
     </a>
-
-    <div class="quiz-container">
-        <div class="quiz-header">
-            <h1>{{ language }} Quiz</h1>
-            <span class="badge rounded-pill">{{ difficulty|capitalize }}</span>
+    <div class="container" style="max-width: 700px; margin: 0 auto; padding: 2.5rem 0;">
+        <div style="text-align: center; margin-bottom: 2.5rem;">
+            <h1 style="font-weight: 700; color: #4361ee; margin-bottom: 0.5rem;">{{ language }} Quiz</h1>
+            <span class="badge rounded-pill" style="background: #e3f0ff; color: #4361ee; font-size: 1.1rem; padding: 0.6rem 1.5rem; font-weight: 600;">{{ difficulty|capitalize }}</span>
         </div>
-
-        <div class="progress-container">
-            <div class="progress-text">
-                <span>Progress</span>
-                <span><span id="current-question">0</span>/{{ questions|length }}</span>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-bar-fill" id="quiz-progress" style="width: 0%"></div>
-            </div>
-        </div>
-
-        <form id="quizForm" action="{{ url_for('submit_quiz') }}" method="post">
+        <form action="{{ url_for('quiz_questions') }}" method="post">
             <input type="hidden" name="language" value="{{ language }}">
             <input type="hidden" name="difficulty" value="{{ difficulty }}">
-            <!-- Store the question IDs in the order they are displayed -->
-            <input type="hidden" name="question_order" id="question_order" value="{{ questions|map(attribute='number')|join(',') }}">
-
-            {% for question in questions %}
-            <div class="question-card" id="question-{{ question.number }}" data-time-limit="{{ question.time_limit }}" data-question-id="{{ question.number }}">
-                <h3>Question {{ question.number }}: {{ question.text }}</h3>
-                <!-- CRITICAL FIX: Ensure all question data is properly stored -->
-                <input type="hidden" name="time_{{ question.number }}" id="time_{{ question.number }}" value="0">
-                <input type="hidden" name="question_id_{{ question.number }}" value="{{ question.number }}">
-
-                <!-- Store question text - use question.text or question.question depending on what's available -->
-                {% if question.text is defined and question.text %}
-                <input type="hidden" name="question_text_{{ question.number }}" value="{{ question.text }}">
-                {% elif question.question is defined and question.question %}
-                <input type="hidden" name="question_text_{{ question.number }}" value="{{ question.question }}">
-                {% else %}
-                <input type="hidden" name="question_text_{{ question.number }}" value="Question {{ question.number }}">
+            {% for q in questions %}
+            <div class="question-card" id="question-{{ q.id }}" style="background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(67,97,238,0.07); margin-bottom: 2.2rem; padding: 2rem 2rem 1.5rem 2rem;">
+                <div style="font-size: 1.18rem; font-weight: 600; color: #222; margin-bottom: 1.2rem;">Question {{ loop.index }}: {{ q.question }}</div>
+                {% if language != 'English' %}
+                <button type="button" class="translate-btn" data-qid="{{ q.id }}" data-question="{{ q.question|escape }}" data-type="{{ q.question_type }}" data-explanation="{{ q.options.explanation|default('')|escape }}">
+                    <i class="fas fa-language me-1"></i>Translate
+                </button>
                 {% endif %}
+                <div id="translation-{{ q.id }}" class="mt-2" style="color: #008060; font-style: italic;"></div>
 
-                <!-- Store correct answer -->
-                {% if question.type == 'matching' %}
-                    {% if question.pairs %}
-                        <input type="hidden" name="correct_answer_{{ question.number }}" value="{% for pair in question.pairs %}{{ pair[0] }} → {{ pair[1] }}{% if not loop.last %}, {% endif %}{% endfor %}">
-                    {% elif question.correct_matches %}
-                        <input type="hidden" name="correct_answer_{{ question.number }}" value="{% for pair in question.correct_matches %}{{ pair[0] }} → {{ pair[1] }}{% if not loop.last %}, {% endif %}{% endfor %}">
-                    {% else %}
-                        <!-- Fallback for any other matching question format -->
-                        <input type="hidden" name="correct_answer_{{ question.number }}" value="Matching question with no pairs data">
-                    {% endif %}
-                {% else %}
-                    <input type="hidden" name="correct_answer_{{ question.number }}" value="{{ question.answer }}">
-                {% endif %}
-
-                <!-- Store question type -->
-                <input type="hidden" name="question_type_{{ question.number }}" value="{{ question.type }}">
-
-                <!-- Store options for multiple choice questions -->
-                {% if question.type in ['multiple_choice', 'multiple_choice_image'] and question.options %}
-                <input type="hidden" name="options_{{ question.number }}" value="{{ question.options|join('|') }}">
-                {% endif %}
-
-                <!-- Store pairs for matching questions -->
-                {% if question.type == 'matching' %}
-                    {% if question.pairs %}
-                    <input type="hidden" name="pairs_{{ question.number }}" value="{% for pair in question.pairs %}{{ pair[0] }}:{{ pair[1] }}{% if not loop.last %}|{% endif %}{% endfor %}">
-                    {% elif question.correct_matches %}
-                    <input type="hidden" name="pairs_{{ question.number }}" value="{% for pair in question.correct_matches %}{{ pair[0] }}:{{ pair[1] }}{% if not loop.last %}|{% endif %}{% endfor %}">
-                    {% endif %}
-                {% endif %}
-
-                <!-- Store left items for matching questions -->
-                {% if question.type == 'matching' and question.left_items %}
-                <input type="hidden" name="left_items_{{ question.number }}" value="{{ question.left_items|join('|') }}">
-                {% endif %}
-
-                <!-- Store right items for matching questions -->
-                {% if question.type == 'matching' and question.right_items %}
-                <input type="hidden" name="right_items_{{ question.number }}" value="{{ question.right_items|join('|') }}">
-                {% endif %}
-
-                <!-- Store words for sentence construction questions -->
-                {% if question.type == 'sentence_construction' and question.words %}
-                <input type="hidden" name="words_{{ question.number }}" value="{{ question.words|join('|') }}">
-                {% endif %}
-
-                <!-- Store acceptable responses if available -->
-                {% if question.acceptable_responses %}
-                <input type="hidden" name="acceptable_responses_{{ question.number }}" value="{{ question.acceptable_responses|join('|') }}">
-                {% endif %}
-
-                {% if question.type == 'multiple_choice' or question.type == 'multiple_choice_image' %}
+                {% if q.question_type == 'multiple_choice' %}
                 <div class="options">
-                    {% for option in question.options %}
-                    <label class="option {% if question.type == 'multiple_choice_image' %}image-option{% endif %}">
-                        <input type="radio" name="q_{{ question.number }}" value="{{ option }}" required>
-                        <span class="option-label">{{ option }}</span>
+                    {% for opt in q.options %}
+                    <label class="option" style="background: #f8f9fa; border-radius: 8px; border: 1.5px solid #dee2e6; padding: 1rem 1.25rem; margin-bottom: 0.7rem; display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="q{{ q.id }}" value="{{ opt }}" required style="margin-right: 1rem; transform: scale(1.2); accent-color: #4361ee;">
+                        <span class="option-label" style="font-size: 1.08rem; color: #222;">{{ opt }}</span>
                     </label>
                     {% endfor %}
                 </div>
 
-                {% elif question.type == 'fill_blank' %}
-                <div class="fill-blank">
-                    <!-- CRITICAL FIX: Handle both question.text and question.question formats -->
-                    {% if question.text is defined and '___' in question.text %}
-                    <p>Fill in the blank: {{ question.text.replace('___', '<input type="text" name="q_' + question.number|string + '" class="fill-blank-input" required>') | safe }}</p>
-                    {% elif question.question is defined %}
-                    <p>{{ question.question }}</p>
-                    <input type="text" name="q_{{ question.number }}" class="fill-blank-input" required>
-                    {% else %}
-                    <p>Fill in the blank: <input type="text" name="q_{{ question.number }}" class="fill-blank-input" required></p>
-                    {% endif %}
-
-                    {% if question.hint %}
-                    <button type="button" class="hint-button" onclick="showHint('{{ question.number }}')">
-                        <i class="fas fa-lightbulb"></i> Hint
-                    </button>
-                    <div class="hint-text" id="hint-{{ question.number }}">{{ question.hint }}</div>
-                    {% endif %}
-                </div>
-
-                {% elif question.type == 'matching' or question.type == 'word_matching' %}
+                {% elif q.question_type == 'word_matching' %}
                 <div class="matching-container">
-                    <div class="matching-column" id="left-col-{{ question.number }}">
-                        {% for item in question.left_items %}
-                        <div class="matching-item" data-id="{{ loop.index0 }}">{{ item }}</div>
+                    <div class="matching-column">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Left</div>
+                        {% for pair in q.options %}
+                        <div class="matching-item" data-qid="{{ q.id }}" data-left="{{ pair[0] }}">{{ pair[0] }}</div>
                         {% endfor %}
                     </div>
-                    <div class="matching-column" id="right-col-{{ question.number }}">
-                        {% for item in question.right_items %}
-                        <div class="matching-item" data-id="{{ loop.index0 }}">{{ item }}</div>
+                    <div class="matching-column">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Right</div>
+                        {% for pair in q.options %}
+                        <div class="matching-item" data-qid="{{ q.id }}" data-right="{{ pair[1] }}">{{ pair[1] }}</div>
                         {% endfor %}
                     </div>
                 </div>
-                <input type="hidden" name="q_{{ question.number }}" id="matching-answer-{{ question.number }}">
-
-                {% elif question.type == 'sentence_construction' %}
-                <div class="sentence-construction">
-                    <p>Arrange these words to form a correct sentence:</p>
-                    <div class="word-bank" id="word-bank-{{ question.number }}">
-                        {% for word in question.words %}
-                        <div class="word-item" data-word="{{ word }}">{{ word }}</div>
-                        {% endfor %}
-                    </div>
-                    <div class="sentence-area" id="sentence-area-{{ question.number }}"></div>
-                    <input type="hidden" name="q_{{ question.number }}" id="sentence-answer-{{ question.number }}">
+                <div id="matches-{{ q.id }}" class="matched-pairs"></div>
+                <input type="hidden" name="q{{ q.id }}_matches" id="input-matches-{{ q.id }}">
+                <div class="matching-status">
+                    <p>Click items on the left, then click matching items on the right. <span class="matched-count">0</span>/{{ q.options|length }} pairs matched.</p>
                 </div>
 
-                {% elif question.type == 'error_spotting' %}
-                <div class="options">
-                    <p class="error-sentence">{{ question.text.split(':')[1] if ':' in question.text else question.text }}</p>
-                    {% for option in question.options %}
-                    <label class="option">
-                        <input type="radio" name="q_{{ question.number }}" value="{{ option }}" required>
-                        <span class="option-label">{{ option }}</span>
-                    </label>
-                    {% endfor %}
-                </div>
-                {% if question.explanation %}
-                <div class="mt-3 p-3 bg-light rounded border-start border-3 border-warning">
-                    <p class="mb-0"><i class="fas fa-exclamation-triangle text-warning me-2"></i> <strong>Grammar Note:</strong> {{ question.explanation }}</p>
-                </div>
-                {% endif %}
-
-                {% elif question.type == 'context_responses' or question.type == 'mini_dialogue' or question.type == 'phrase_completion' or question.type == 'basic_vocab' or question.type == 'simple_sentences' or question.type == 'news_headline' or question.type == 'debate_style' or question.type == 'complex_rephrasing' %}
-                <div class="options">
-                    {% for option in question.options %}
-                    <label class="option">
-                        <input type="radio" name="q_{{ question.number }}" value="{{ option }}" required>
-                        <span class="option-label">{{ option }}</span>
-                    </label>
-                    {% endfor %}
-                </div>
-
-                {% elif question.type == 'idiom_interpretation' or question.type == 'cultural_nuances' %}
-                <div class="options">
-                    {% for option in question.options %}
-                    <label class="option">
-                        <input type="radio" name="q_{{ question.number }}" value="{{ option }}" required>
-                        <span class="option-label">{{ option }}</span>
-                    </label>
-                    {% endfor %}
-                </div>
-                {% if question.explanation %}
-                <div class="mt-3 p-3 bg-light rounded border-start border-3 border-info">
-                    <p class="mb-0"><i class="fas fa-info-circle text-info me-2"></i> <strong>Note:</strong> {{ question.explanation }}</p>
-                </div>
-                {% endif %}
-
-                {% elif question.type == 'grammar_application' %}
-                <div class="fill-blank">
-                    <p>{{ question.question }}</p>
-                    <input type="text" name="q_{{ question.number }}" class="fill-blank-input" required>
-                    {% if question.hint %}
-                    <button type="button" class="hint-button" onclick="showHint('{{ question.number }}')">
-                        <i class="fas fa-lightbulb"></i> Hint
-                    </button>
-                    <div class="hint-text" id="hint-{{ question.number }}">{{ question.hint }}</div>
+                {% elif q.question_type == 'fill_in_the_blanks' %}
+                <div class="fill-blank" style="display: flex; align-items: center; gap: 1rem;">
+                    <input type="text" name="q{{ q.id }}" class="form-control" placeholder="Your answer" required style="max-width: 300px;">
+                    {% if q.options.hint %}
+                    <button type="button" class="btn btn-link text-primary hint-button" onclick="showHint('{{ q.id }}')" style="font-size: 1rem;">Show Hint</button>
+                    <div class="hint-text" id="hint-{{ q.id }}" style="display:none; color:#888; font-size:0.98rem; margin-top:0.5rem;">{{ q.options.hint }}</div>
                     {% endif %}
                 </div>
 
-                {% elif question.type == 'audio_recognition' %}
-                <div class="audio-recognition">
-                    <audio controls>
-                        <source src="{{ url_for('static', filename='audio/' + question.audio_file) }}" type="audio/mpeg">
-                        Your browser does not support the audio element.
-                    </audio>
-                    <div class="options mt-3">
-                        {% for option in question.options %}
-                        <label class="option">
-                            <input type="radio" name="q_{{ question.number }}" value="{{ option }}" required>
-                            <span class="option-label">{{ option }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
+                {% elif q.question_type == 'error_spotting' %}
+                <div class="error-sentence" style="font-style: italic; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 3px solid #ffc107; margin-bottom: 1rem;">{{ q.question.split(':')[1] if ':' in q.question else q.question }}</div>
+                <div class="options">
+                    {% for opt in q.options %}
+                    <label class="option" style="background: #f8f9fa; border-radius: 8px; border: 1.5px solid #dee2e6; padding: 1rem 1.25rem; margin-bottom: 0.7rem; display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="q{{ q.id }}" value="{{ opt }}" required style="margin-right: 1rem; transform: scale(1.2); accent-color: #4361ee;">
+                        <span class="option-label" style="font-size: 1.08rem; color: #222;">{{ opt }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                {% else %}
+                <div class="options">
+                    {% for opt in q.options %}
+                    <label class="option">
+                        <input type="radio" name="q{{ q.id }}" value="{{ opt }}" required>
+                        <span class="option-label">{{ opt }}</span>
+                    </label>
+                    {% endfor %}
                 </div>
                 {% endif %}
             </div>
             {% endfor %}
-
-            <button type="submit" class="submit-btn" id="submitBtn" disabled>
-                <i class="fas fa-paper-plane me-2"></i>Submit Quiz
-            </button>
-
-            <!-- Hidden debug button - only visible when there's an issue -->
-            <button type="button" id="debugBtn" style="display: none; margin-top: 10px;" class="btn btn-sm btn-outline-secondary">
-                <i class="fas fa-bug me-1"></i> Debug Quiz Status
-            </button>
+            <button type="submit" class="submit-btn" style="background: #4361ee; color: #fff; border-radius: 8px; font-weight: 600; font-size: 1.15rem; margin: 2.5rem auto 0 auto; display: block; max-width: 300px; box-shadow: 0 4px 15px rgba(67, 97, 238, 0.18);">Submit Quiz</button>
         </form>
     </div>
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const questionCards = document.querySelectorAll('.question-card');
-        const submitBtn = document.getElementById('submitBtn');
-        const debugBtn = document.getElementById('debugBtn');
-        const form = document.getElementById('quizForm');
-        const currentQuestionEl = document.getElementById('current-question');
-        const progressBar = document.getElementById('quiz-progress');
+        // Word Matching Interactivity
+        const matchStates = {};
+        document.querySelectorAll('.matching-container').forEach(function(container) {
+            const qid = container.querySelector('.matching-item').dataset.qid;
+            matchStates[qid] = { left: null, right: null, matches: [] };
+            const leftItems = container.querySelectorAll('.matching-item[data-left]');
+            const rightItems = container.querySelectorAll('.matching-item[data-right]');
+            const matchesDiv = document.getElementById('matches-' + qid);
+            const inputMatches = document.getElementById('input-matches-' + qid);
+            const statusDiv = container.nextElementSibling.nextElementSibling;
+            const matchedCountEl = statusDiv.querySelector('.matched-count');
 
-        // Show debug button after 10 seconds if submit button is still disabled
-        setTimeout(() => {
-            if (submitBtn.disabled) {
-                debugBtn.style.display = 'block';
-            }
-        }, 10000);
-
-        // Initialize timers for each question
-        questionCards.forEach(card => {
-            const timeLimit = parseInt(card.dataset.timeLimit);
-            const timeInput = card.querySelector('input[type="hidden"]');
-            let timeLeft = timeLimit;
-
-            // Start timer when question becomes visible
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const timerInterval = setInterval(() => {
-                            timeLeft--;
-                            timeInput.value = timeLimit - timeLeft;
-
-                            // Show motivational message only at half time (reduced frequency)
-                            if (timeLeft === Math.floor(timeLimit / 2)) {
-                                showMotivationalMessage(card, "You're doing great! Keep going!");
-                            }
-
-                            if (timeLeft <= 0) {
-                                clearInterval(timerInterval);
-                            }
-                        }, 1000);
-                    }
+            function renderMatches() {
+                matchesDiv.innerHTML = '';
+                matchStates[qid].matches.forEach(function(pair, idx) {
+                    const matchEl = document.createElement('div');
+                    matchEl.className = 'matched-pair';
+                    matchEl.innerHTML = `
+                        <span class="left-item">${pair[0]}</span>
+                        <i class="fas fa-arrow-right mx-2"></i>
+                        <span class="right-item">${pair[1]}</span>
+                        <button type="button" class="btn-remove-match" data-idx="${idx}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    matchesDiv.appendChild(matchEl);
                 });
-            }, { threshold: 0.5 });
 
-            observer.observe(card);
-        });
+                inputMatches.value = JSON.stringify(matchStates[qid].matches);
+                matchedCountEl.textContent = matchStates[qid].matches.length;
 
-        // Show motivational message
-        function showMotivationalMessage(card, message) {
-            // Remove any existing message
-            const existingMessage = card.querySelector('.motivation-message');
-            if (existingMessage) {
-                existingMessage.remove();
-            }
-
-            // Create and add new message
-            const messageEl = document.createElement('div');
-            messageEl.className = 'motivation-message';
-            messageEl.innerHTML = `<i class="fas fa-star me-2"></i>${message}`;
-            card.appendChild(messageEl);
-
-            // Auto-remove after 2 seconds (reduced duration)
-            setTimeout(() => {
-                messageEl.style.opacity = '0';
-                setTimeout(() => messageEl.remove(), 500);
-            }, 2000);
-        }
-
-        // Update progress
-        function updateProgress() {
-            // Count all questions
-            const totalQuestions = questionCards.length;
-
-            // Count answered questions by type
-            const radioAnswered = document.querySelectorAll('input[type="radio"]:checked').length;
-
-            // Count text inputs that have a value (improved to check actual value, not just attribute)
-            const textAnswered = Array.from(document.querySelectorAll('input[type="text"]'))
-                .filter(input => input.value && input.value.trim() !== '').length;
-
-            // For matching questions, check if all pairs are matched for each question
-            const matchingAnswered = Array.from(document.querySelectorAll('[id^="matching-answer-"]')).filter(input => {
-                if (!input.value) return false;
-
-                // Get the question number
-                const questionNumber = input.id.split('-')[2];
-
-                // Get the matching container
-                const container = document.querySelector(`#question-${questionNumber} .matching-container`);
-                if (!container) return false;
-
-                // Get the number of left items (total pairs)
-                const totalPairs = container.querySelectorAll('.matching-column:first-child .matching-item').length;
-
-                // Get the number of matches
-                const matches = input.value.split(',');
-
-                // Consider answered if all pairs are matched
-                return matches.length === totalPairs;
-            }).length;
-
-            const sentenceAnswered = document.querySelectorAll('[id^="sentence-answer-"][value]').length;
-
-            // Total answered questions
-            const totalAnswered = radioAnswered + textAnswered + matchingAnswered + sentenceAnswered;
-
-            // Calculate progress percentage
-            const progress = (totalAnswered / totalQuestions) * 100;
-
-            progressBar.style.width = `${progress}%`;
-            currentQuestionEl.textContent = totalAnswered;
-
-            // Show progress-based motivational message only when all questions are answered
-            if (progress === 100) {
-                showGlobalMessage("All questions answered! Ready to submit!");
-            }
-        }
-
-        // Show global message
-        function showGlobalMessage(message) {
-            const messageEl = document.createElement('div');
-            messageEl.className = 'alert alert-success alert-dismissible fade show';
-            messageEl.style.position = 'fixed';
-            messageEl.style.top = '20px';
-            messageEl.style.left = '50%';
-            messageEl.style.transform = 'translateX(-50%)';
-            messageEl.style.zIndex = '1000';
-            messageEl.style.maxWidth = '500px';
-            messageEl.style.width = '90%';
-            messageEl.innerHTML = `
-                <i class="fas fa-check-circle me-2"></i>${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            `;
-            document.body.appendChild(messageEl);
-
-            // Auto-dismiss after 2 seconds (reduced duration)
-            setTimeout(() => {
-                messageEl.classList.remove('show');
-                setTimeout(() => messageEl.remove(), 150);
-            }, 2000);
-        }
-
-        // Check if all questions are answered
-        function checkAllQuestionsAnswered() {
-            // Count all questions
-            const totalQuestions = questionCards.length;
-
-            // Count answered questions by type
-            const radioAnswered = document.querySelectorAll('input[type="radio"]:checked').length;
-
-            // Count text inputs that have a value (improved to check actual value, not just attribute)
-            const textAnswered = Array.from(document.querySelectorAll('input[type="text"]'))
-                .filter(input => input.value && input.value.trim() !== '').length;
-
-            // For matching questions, check if all pairs are matched
-            const matchingAnswered = Array.from(document.querySelectorAll('[id^="matching-answer-"]')).filter(input => {
-                if (!input.value) return false;
-
-                // Get the question number
-                const questionNumber = input.id.split('-')[2];
-
-                // Get the matching container
-                const container = document.querySelector(`#question-${questionNumber} .matching-container`);
-                if (!container) return false;
-
-                // Get the number of left items (total pairs)
-                const totalPairs = container.querySelectorAll('.matching-column:first-child .matching-item').length;
-
-                // Get the number of matches
-                const matches = input.value.split(',');
-
-                // Consider answered if all pairs are matched
-                return matches.length === totalPairs;
-            }).length;
-
-            const sentenceAnswered = document.querySelectorAll('[id^="sentence-answer-"][value]').length;
-
-            // Total answered questions
-            const totalAnswered = radioAnswered + textAnswered + matchingAnswered + sentenceAnswered;
-
-            // Enable/disable submit button
-            const allAnswered = totalQuestions === totalAnswered;
-            submitBtn.disabled = !allAnswered;
-
-            return allAnswered;
-        }
-
-        // Add event listeners to inputs
-        document.querySelectorAll('input[type="radio"]').forEach(input => {
-            input.addEventListener('change', function() {
-                const questionNumber = this.name.split('_')[1];
-                const questionCard = document.getElementById(`question-${questionNumber}`);
-                questionCard.classList.remove('unanswered');
-                updateProgress();
-                checkAllQuestionsAnswered();
-            });
-        });
-
-        // Add separate event listeners for text inputs (both change and input events)
-        document.querySelectorAll('input[type="text"]').forEach(input => {
-            // Listen for both change and input events to catch all ways text can be entered
-            ['change', 'input', 'keyup'].forEach(eventType => {
-                input.addEventListener(eventType, function() {
-                    if (this.value && this.value.trim() !== '') {
-                        const questionNumber = this.name.split('_')[1];
-                        const questionCard = document.getElementById(`question-${questionNumber}`);
-                        questionCard.classList.remove('unanswered');
-                        updateProgress();
-                        checkAllQuestionsAnswered();
-                    }
-                });
-            });
-        });
-
-        // Initialize matching questions
-        document.querySelectorAll('.matching-container').forEach(container => {
-            const questionCard = container.closest('.question-card');
-            const questionNumber = questionCard.id.split('-')[1];
-            const leftItems = container.querySelectorAll('.matching-column:first-child .matching-item');
-            const rightItems = container.querySelectorAll('.matching-column:last-child .matching-item');
-            const answerInput = document.getElementById(`matching-answer-${questionNumber}`);
-
-            // Create a status message element
-            const statusMessage = document.createElement('div');
-            statusMessage.className = 'matching-status';
-            statusMessage.innerHTML = `<p>Click items on the left, then click matching items on the right. <span class="matched-count">0</span>/${leftItems.length} pairs matched.</p>`;
-            container.insertAdjacentElement('afterend', statusMessage);
-
-            // Create a reset button
-            const resetButton = document.createElement('button');
-            resetButton.type = 'button';
-            resetButton.className = 'btn btn-sm btn-outline-secondary mt-2';
-            resetButton.innerHTML = '<i class="fas fa-redo-alt"></i> Reset Matches';
-            statusMessage.appendChild(resetButton);
-
-            // Create a container for matched pairs
-            const matchedPairsContainer = document.createElement('div');
-            matchedPairsContainer.className = 'matched-pairs mt-3';
-            statusMessage.appendChild(matchedPairsContainer);
-
-            // Track all matches
-            const matches = [];
-            let selectedLeft = null;
-
-            // Function to update the answer input with all matches
-            function updateAnswerInput() {
-                if (matches.length > 0) {
-                    // Format: "leftId1:rightId1,leftId2:rightId2,..."
-                    answerInput.value = matches.map(m => `${m.leftId}:${m.rightId}`).join(',');
-                    questionCard.classList.remove('unanswered');
-
-                    // Update the matched count display
-                    const matchedCountEl = statusMessage.querySelector('.matched-count');
-                    matchedCountEl.textContent = matches.length;
-
-                    // If all items are matched, highlight the status message
-                    if (matches.length === leftItems.length) {
-                        statusMessage.classList.add('all-matched');
-                        statusMessage.querySelector('p').innerHTML = `<strong>All ${matches.length} pairs matched!</strong>`;
-                    }
-
-                    updateProgress();
-                    checkAllQuestionsAnswered();
+                if (matchStates[qid].matches.length === leftItems.length) {
+                    statusDiv.classList.add('all-matched');
+                    statusDiv.querySelector('p').innerHTML = `<strong>All ${matchStates[qid].matches.length} pairs matched!</strong>`;
                 } else {
-                    answerInput.value = '';
-                    statusMessage.classList.remove('all-matched');
-                    statusMessage.querySelector('p').innerHTML = `<p>Click items on the left, then click matching items on the right. <span class="matched-count">0</span>/${leftItems.length} pairs matched.</p>`;
+                    statusDiv.classList.remove('all-matched');
+                    statusDiv.querySelector('p').innerHTML = `Click items on the left, then click matching items on the right. <span class="matched-count">${matchStates[qid].matches.length}</span>/${leftItems.length} pairs matched.`;
                 }
             }
 
-            // Function to display matched pairs
-            function updateMatchedPairsDisplay() {
-                matchedPairsContainer.innerHTML = '';
-
-                if (matches.length > 0) {
-                    matches.forEach((match, index) => {
-                        const matchEl = document.createElement('div');
-                        matchEl.className = 'matched-pair';
-                        matchEl.innerHTML = `
-                            <span class="left-item">${match.leftText}</span>
-                            <i class="fas fa-arrow-right mx-2"></i>
-                            <span class="right-item">${match.rightText}</span>
-                            <button type="button" class="btn-remove-match" data-index="${index}">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        `;
-                        matchedPairsContainer.appendChild(matchEl);
-                    });
-
-                    // Add event listeners to remove buttons
-                    matchedPairsContainer.querySelectorAll('.btn-remove-match').forEach(btn => {
-                        btn.addEventListener('click', function() {
-                            const index = parseInt(this.dataset.index);
-                            const match = matches[index];
-
-                            // Remove the match
-                            matches.splice(index, 1);
-
-                            // Remove the matched class from the items
-                            document.querySelector(`#left-col-${questionNumber} .matching-item[data-id="${match.leftId}"]`).classList.remove('matched');
-                            document.querySelector(`#right-col-${questionNumber} .matching-item[data-id="${match.rightId}"]`).classList.remove('matched');
-
-                            // Update the display
-                            updateMatchedPairsDisplay();
-                            updateAnswerInput();
-                        });
-                    });
-                }
-            }
-
-            // Reset all matches
-            resetButton.addEventListener('click', function() {
-                matches.length = 0;
-                selectedLeft = null;
-
-                // Remove all matched classes
-                leftItems.forEach(item => item.classList.remove('selected', 'matched'));
-                rightItems.forEach(item => item.classList.remove('selected', 'matched'));
-
-                // Update the display
-                updateMatchedPairsDisplay();
-                updateAnswerInput();
-            });
-
-            // Left column item click handler
             leftItems.forEach(item => {
                 item.addEventListener('click', function() {
-                    // Skip if already matched
                     if (this.classList.contains('matched')) return;
-
-                    // Remove selected class from all left items
                     leftItems.forEach(i => i.classList.remove('selected'));
-
-                    // Add selected class to this item
                     this.classList.add('selected');
-                    selectedLeft = {
-                        id: this.dataset.id,
-                        text: this.textContent.trim()
-                    };
+                    matchStates[qid].left = this.dataset.left;
                 });
             });
 
-            // Right column item click handler
             rightItems.forEach(item => {
                 item.addEventListener('click', function() {
-                    // Skip if already matched or no left item selected
-                    if (this.classList.contains('matched') || !selectedLeft) return;
+                    if (!matchStates[qid].left || this.classList.contains('matched')) return;
+                    if (matchStates[qid].matches.length >= leftItems.length) return;
 
-                    const rightId = this.dataset.id;
-                    const rightText = this.textContent.trim();
+                    const left = matchStates[qid].left;
+                    const right = this.dataset.right;
 
-                    // Check if this right item is already matched
-                    const existingMatchIndex = matches.findIndex(m => m.rightId === rightId);
-                    if (existingMatchIndex !== -1) {
-                        // Remove the existing match
-                        const existingMatch = matches[existingMatchIndex];
-                        document.querySelector(`#left-col-${questionNumber} .matching-item[data-id="${existingMatch.leftId}"]`).classList.remove('matched');
-                        matches.splice(existingMatchIndex, 1);
-                    }
+                    if (matchStates[qid].matches.some(pair => pair[0] === left || pair[1] === right)) return;
 
-                    // Check if the selected left item is already matched
-                    const leftMatchIndex = matches.findIndex(m => m.leftId === selectedLeft.id);
-                    if (leftMatchIndex !== -1) {
-                        // Remove the existing match
-                        const leftMatch = matches[leftMatchIndex];
-                        document.querySelector(`#right-col-${questionNumber} .matching-item[data-id="${leftMatch.rightId}"]`).classList.remove('matched');
-                        matches.splice(leftMatchIndex, 1);
-                    }
-
-                    // Add the new match
-                    matches.push({
-                        leftId: selectedLeft.id,
-                        rightId: rightId,
-                        leftText: selectedLeft.text,
-                        rightText: rightText
-                    });
-
-                    // Mark both items as matched
-                    document.querySelector(`#left-col-${questionNumber} .matching-item[data-id="${selectedLeft.id}"]`).classList.add('matched');
-                    this.classList.add('matched');
-
-                    // Clear the selection
+                    matchStates[qid].matches.push([left, right]);
+                    matchStates[qid].left = null;
                     leftItems.forEach(i => i.classList.remove('selected'));
-                    selectedLeft = null;
-
-                    // Update the display
-                    updateMatchedPairsDisplay();
-                    updateAnswerInput();
-                });
-            });
-        });
-
-        // Initialize sentence construction questions
-        document.querySelectorAll('.sentence-construction').forEach(container => {
-            const questionCard = container.closest('.question-card');
-            const questionNumber = questionCard.id.split('-')[1];
-            const wordBank = document.getElementById(`word-bank-${questionNumber}`);
-            const sentenceArea = document.getElementById(`sentence-area-${questionNumber}`);
-            const answerInput = document.getElementById(`sentence-answer-${questionNumber}`);
-
-            // Shuffle words in the word bank
-            const words = Array.from(wordBank.children);
-            for (let i = words.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                wordBank.appendChild(words[j]);
-            }
-
-            // Make words draggable
-            words.forEach(word => {
-                word.draggable = true;
-
-                word.addEventListener('dragstart', function(e) {
-                    e.dataTransfer.setData('text/plain', word.dataset.word);
-                    setTimeout(() => {
-                        word.style.opacity = '0.4';
-                    }, 0);
-                });
-
-                word.addEventListener('dragend', function() {
-                    word.style.opacity = '1';
-                });
-
-                // Click to move between areas
-                word.addEventListener('click', function() {
-                    const parent = word.parentElement;
-                    if (parent === wordBank) {
-                        sentenceArea.appendChild(word);
-                    } else {
-                        wordBank.appendChild(word);
-                    }
-                    updateSentence();
+                    renderMatches();
                 });
             });
 
-            // Make sentence area a drop target
-            sentenceArea.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-            });
-
-            sentenceArea.addEventListener('drop', function(e) {
-                e.preventDefault();
-                const word = e.dataTransfer.getData('text/plain');
-                const wordElement = document.querySelector(`.word-item[data-word="${word}"]`);
-                sentenceArea.appendChild(wordElement);
-                updateSentence();
-            });
-
-            // Make word bank a drop target too
-            wordBank.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-            });
-
-            wordBank.addEventListener('drop', function(e) {
-                e.preventDefault();
-                const word = e.dataTransfer.getData('text/plain');
-                const wordElement = document.querySelector(`.word-item[data-word="${word}"]`);
-                wordBank.appendChild(wordElement);
-                updateSentence();
-            });
-
-            // Update the sentence input value
-            function updateSentence() {
-                const sentenceWords = Array.from(sentenceArea.children).map(word => word.dataset.word);
-                const sentence = sentenceWords.join(' ');
-                answerInput.value = sentence;
-
-                if (sentenceWords.length > 0) {
-                    questionCard.classList.remove('unanswered');
-                    updateProgress();
-                    checkAllQuestionsAnswered();
-                } else {
-                    answerInput.value = '';
+            matchesDiv.addEventListener('click', function(e) {
+                if (e.target.closest('.btn-remove-match')) {
+                    const idx = parseInt(e.target.closest('.btn-remove-match').dataset.idx);
+                    matchStates[qid].matches.splice(idx, 1);
+                    renderMatches();
                 }
-            }
-        });
-
-        // Form submission handler
-        form.addEventListener('submit', function(e) {
-            // Force a final check of all questions
-            updateProgress();
-            const allAnswered = checkAllQuestionsAnswered();
-
-            if (!allAnswered) {
-                e.preventDefault();
-
-                // Log for debugging
-                console.log("Not all questions answered. Checking which ones are missing...");
-
-                // Highlight unanswered questions
-                questionCards.forEach(card => {
-                    const questionNumber = card.id.split('-')[1];
-
-                    // Check different question types
-                    let answered = false;
-
-                    // Check radio buttons
-                    const radioInput = document.querySelector(`input[name="q_${questionNumber}"]:checked`);
-                    if (radioInput) {
-                        answered = true;
-                    }
-
-                    // Check text inputs - make sure they have actual values
-                    const textInput = document.querySelector(`input[name="q_${questionNumber}"][type="text"]`);
-                    if (textInput && textInput.value && textInput.value.trim() !== '') {
-                        answered = true;
-                    }
-
-                    // Check matching questions
-                    const matchingInput = document.querySelector(`#matching-answer-${questionNumber}`);
-                    if (matchingInput && matchingInput.value) {
-                        // For matching, check if all pairs are matched
-                        const container = document.querySelector(`#question-${questionNumber} .matching-container`);
-                        if (container) {
-                            const totalPairs = container.querySelectorAll('.matching-column:first-child .matching-item').length;
-                            const matches = matchingInput.value.split(',');
-                            if (matches.length === totalPairs) {
-                                answered = true;
-                            }
-                        } else {
-                            // If no container but has value, consider it answered
-                            answered = true;
-                        }
-                    }
-
-                    // Check sentence construction
-                    const sentenceInput = document.querySelector(`#sentence-answer-${questionNumber}`);
-                    if (sentenceInput && sentenceInput.value) {
-                        answered = true;
-                    }
-
-                    // Log for debugging
-                    if (!answered) {
-                        console.log(`Question ${questionNumber} is not answered`);
-                    }
-
-                    // Add unanswered class if not answered
-                    if (!answered) {
-                        card.classList.add('unanswered');
-                    } else {
-                        card.classList.remove('unanswered');
-                    }
-                });
-
-                // Scroll to first unanswered question
-                const firstUnanswered = document.querySelector('.unanswered');
-                if (firstUnanswered) {
-                    window.scrollTo({
-                        top: firstUnanswered.offsetTop - 100,
-                        behavior: 'smooth'
-                    });
-                }
-
-                // Show alert
-                const alert = document.createElement('div');
-                alert.className = 'alert alert-danger alert-dismissible fade show';
-                alert.style.position = 'fixed';
-                alert.style.top = '20px';
-                alert.style.left = '50%';
-                alert.style.transform = 'translateX(-50%)';
-                alert.style.zIndex = '1000';
-                alert.style.maxWidth = '500px';
-                alert.style.width = '90%';
-                alert.innerHTML = `
-                    <strong>Incomplete Quiz!</strong> Please answer all questions before submitting.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-                document.body.appendChild(alert);
-
-                // Auto-dismiss after 5 seconds
-                setTimeout(() => {
-                    alert.classList.remove('show');
-                    setTimeout(() => alert.remove(), 150);
-                }, 5000);
-            }
-        });
-
-        // Initialize progress and check all questions on page load
-        updateProgress();
-
-        // Check for any pre-filled inputs (in case of page refresh)
-        document.querySelectorAll('input[type="text"]').forEach(input => {
-            if (input.value && input.value.trim() !== '') {
-                const questionNumber = input.name.split('_')[1];
-                const questionCard = document.getElementById(`question-${questionNumber}`);
-                if (questionCard) {
-                    questionCard.classList.remove('unanswered');
-                }
-            }
-        });
-
-        // Force a check of all questions after a short delay to ensure everything is loaded
-        setTimeout(() => {
-            updateProgress();
-            checkAllQuestionsAnswered();
-        }, 500);
-
-        // Debug button functionality
-        debugBtn.addEventListener('click', function() {
-            // Create a debug report
-            let report = "Quiz Status Report:\n\n";
-            report += `Total Questions: ${questionCards.length}\n`;
-
-            // Count by type
-            const radioAnswered = document.querySelectorAll('input[type="radio"]:checked').length;
-            const textInputs = Array.from(document.querySelectorAll('input[type="text"]'));
-            const textAnswered = textInputs.filter(input => input.value && input.value.trim() !== '').length;
-            const matchingAnswered = Array.from(document.querySelectorAll('[id^="matching-answer-"]')).filter(input => input.value).length;
-            const sentenceAnswered = document.querySelectorAll('[id^="sentence-answer-"][value]').length;
-
-            report += `Radio Questions Answered: ${radioAnswered}\n`;
-            report += `Text Input Questions Answered: ${textAnswered}\n`;
-            report += `Matching Questions Answered: ${matchingAnswered}\n`;
-            report += `Sentence Construction Questions Answered: ${sentenceAnswered}\n\n`;
-
-            // Check each question
-            questionCards.forEach(card => {
-                const questionNumber = card.id.split('-')[1];
-                const questionType = card.querySelector('input[type="radio"]') ? 'radio' :
-                                    card.querySelector('input[type="text"]') ? 'text' :
-                                    card.querySelector('[id^="matching-answer-"]') ? 'matching' :
-                                    card.querySelector('[id^="sentence-answer-"]') ? 'sentence' : 'unknown';
-
-                let status = "❌ Not Answered";
-
-                // Check if answered based on type
-                if (questionType === 'radio' && card.querySelector('input[type="radio"]:checked')) {
-                    status = "✅ Answered";
-                } else if (questionType === 'text') {
-                    const textInput = card.querySelector('input[type="text"]');
-                    if (textInput && textInput.value && textInput.value.trim() !== '') {
-                        status = `✅ Answered: "${textInput.value}"`;
-                    }
-                } else if (questionType === 'matching') {
-                    const matchingInput = card.querySelector('[id^="matching-answer-"]');
-                    if (matchingInput && matchingInput.value) {
-                        const container = card.querySelector('.matching-container');
-                        const totalPairs = container.querySelectorAll('.matching-column:first-child .matching-item').length;
-                        const matches = matchingInput.value.split(',');
-                        status = `${matches.length}/${totalPairs} pairs matched`;
-                        if (matches.length === totalPairs) {
-                            status = "✅ " + status;
-                        } else {
-                            status = "❌ " + status;
-                        }
-                    }
-                } else if (questionType === 'sentence') {
-                    const sentenceInput = card.querySelector('[id^="sentence-answer-"]');
-                    if (sentenceInput && sentenceInput.value) {
-                        status = `✅ Answered: "${sentenceInput.value}"`;
-                    }
-                }
-
-                report += `Question ${questionNumber} (${questionType}): ${status}\n`;
-            });
-
-            // Display the report
-            const reportEl = document.createElement('div');
-            reportEl.className = 'alert alert-info';
-            reportEl.style.position = 'fixed';
-            reportEl.style.top = '50%';
-            reportEl.style.left = '50%';
-            reportEl.style.transform = 'translate(-50%, -50%)';
-            reportEl.style.zIndex = '1000';
-            reportEl.style.maxWidth = '80%';
-            reportEl.style.width = '600px';
-            reportEl.style.maxHeight = '80vh';
-            reportEl.style.overflow = 'auto';
-            reportEl.style.whiteSpace = 'pre-wrap';
-            reportEl.style.fontFamily = 'monospace';
-            reportEl.style.padding = '20px';
-            reportEl.style.boxShadow = '0 0 20px rgba(0,0,0,0.3)';
-
-            reportEl.innerHTML = `
-                <h4><i class="fas fa-bug me-2"></i>Quiz Debug Report</h4>
-                <hr>
-                <pre>${report}</pre>
-                <hr>
-                <button type="button" class="btn btn-primary" id="closeReportBtn">Close</button>
-                <button type="button" class="btn btn-success ms-2" id="forceSubmitBtn">Force Submit</button>
-            `;
-
-            document.body.appendChild(reportEl);
-
-            // Close button
-            document.getElementById('closeReportBtn').addEventListener('click', function() {
-                reportEl.remove();
-            });
-
-            // Force submit button
-            document.getElementById('forceSubmitBtn').addEventListener('click', function() {
-                submitBtn.disabled = false;
-                reportEl.remove();
-                submitBtn.click();
             });
         });
+
+        // Translation functionality
+        document.querySelectorAll('.translate-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const qid = this.dataset.qid;
+                const questionText = this.dataset.question;
+                const type = this.dataset.type;
+                const explanation = this.dataset.explanation;
+                let textToTranslate = questionText;
+                if (type === 'error_spotting' && explanation) {
+                    textToTranslate += '\n\nExplanation: ' + explanation;
+                }
+                translateQuestion(qid, textToTranslate);
+            });
+        });
+
+        function translateQuestion(qid, textToTranslate) {
+            const translationDiv = document.getElementById('translation-' + qid);
+            translationDiv.textContent = 'Translating...';
+            fetch('/translate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: textToTranslate + '\n\nPlease provide a short, simple translation suitable for a language learner.' }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                translationDiv.textContent = data.translation || 'Translation unavailable.';
+            })
+            .catch(() => {
+                translationDiv.textContent = 'Translation failed.';
+            });
+        }
     });
 
-    function showHint(questionNumber) {
-        const hintElement = document.getElementById(`hint-${questionNumber}`);
+    function showHint(questionId) {
+        const hintElement = document.getElementById(`hint-${questionId}`);
         hintElement.style.display = 'block';
     }
     </script>
