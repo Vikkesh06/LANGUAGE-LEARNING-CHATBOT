@@ -538,5 +538,43 @@
         });
     };
     </script>
+    <script>
+    function updateDashboardStats() {
+        fetch('/get_progress_stats')
+            .then(res => res.json())
+            .then(stats => {
+                document.getElementById('words-learned').textContent = stats.words_learned;
+                document.getElementById('conversation-count').textContent = stats.conversation_count;
+                document.getElementById('accuracy-rate').textContent = stats.accuracy_rate + '%';
+                document.getElementById('progress-fill').style.width = stats.progress_percentage + '%';
+                document.getElementById('progress-label').textContent = stats.progress_percentage.toFixed(1) + '% of target';
+                document.getElementById('daily-streak').textContent = stats.daily_streak;
+                // Achievements
+                const achievementsGrid = document.getElementById('achievements-grid');
+                achievementsGrid.innerHTML = '';
+                if (stats.achievements && stats.achievements.length > 0) {
+                    stats.achievements.forEach(ach => {
+                        const card = document.createElement('div');
+                        card.className = 'achievement-card';
+                        card.innerHTML = `<div class="achievement-icon"><i class="fas fa-trophy"></i></div>` +
+                                          `<div>${ach.achievement_name}</div>` +
+                                          `<div style="font-size:0.85rem;color:#888;">${ach.description}</div>`;
+                        achievementsGrid.appendChild(card);
+                    });
+                } else {
+                    achievementsGrid.innerHTML = '<div style="color:#888; text-align:center; width: 100%;">No achievements yet. Keep learning!</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching dashboard stats:', error);
+            });
+    }
+    // Patch window.onload to also update stats
+    const oldOnload = window.onload;
+    window.onload = function() {
+        if (typeof oldOnload === 'function') oldOnload();
+        updateDashboardStats();
+    };
+    </script>
 </body>
 </html>
