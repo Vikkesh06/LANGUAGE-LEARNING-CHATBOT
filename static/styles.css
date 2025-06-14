@@ -20,12 +20,12 @@ body.transitioning {
 }
 
 body.login-bg {
-  background: url('/static/language_learning_chatbot_reg.png.png') no-repeat center center fixed !important;
+  background: url('/static/language_learning_chatbot_background_reg.jpg') no-repeat center center fixed !important;
   background-size: cover !important;
 }
 
 body.register-bg {
-  background: url('/static/language_learning_chatbot_reg.png.png') no-repeat center center fixed !important;
+  background: url('/static/language_learning_chatbot_background_reg.jpg') no-repeat center center fixed !important;
   background-size: cover !important;
 }
 
