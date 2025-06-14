@@ -19,6 +19,20 @@ body.transitioning {
   transition: opacity 0.2s ease;
 }
 
+body.login-bg {
+  background: url('/static/language_learning_chatbot_reg.png.png') no-repeat center center fixed !important;
+  background-size: cover !important;
+}
+
+body.register-bg {
+  background: url('/static/language_learning_chatbot_reg.png.png') no-repeat center center fixed !important;
+  background-size: cover !important;
+}
+
+.login-container, .register-container {
+  background: none !important;
+}
+
 /* Toggle Switch - Circular */
 .toggle-container {
   position: fixed;
@@ -209,11 +223,11 @@ body.dark-mode .text-muted {
 }
 
 .login-container {
-  background-image: url('/static/language_learning_chatbot_background_reg.png');
+  background-image: url('/static/language_learning_chatbot_reg.png');
 }
 
 .register-container {
-  background-image: url('/static/language_learning_chatbot_background_reg.png');
+  background-image: url('/static/language_learning_chatbot_reg.png');
 }
 
 .admin-login-container {
@@ -759,3 +773,259 @@ body {
   background-color: #4caf50;
   transition: width 0.6s ease;
 }
+
+.badge-streak-master { background: #ff7043; }
+.badge-quiz-addict { background: #3949ab; }
+.badge-perfect-10 { background: #ffd600; color: #333; }
+
+.language-card-selector {
+  margin-bottom: 2.5rem;
+  text-align: center;
+}
+.language-label {
+  font-weight: 600;
+  font-size: 1.08rem;
+  margin-bottom: 0.7rem;
+  display: block;
+}
+.language-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.2rem;
+  margin: 1.2rem 0 0.5rem 0;
+}
+.language-card {
+  background: #f7faff;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(59,89,152,0.07);
+  border: 2px solid transparent;
+  min-width: 90px;
+  max-width: 120px;
+  padding: 1.1rem 0.7rem 0.7rem 0.7rem;
+  cursor: pointer;
+  text-align: center;
+  transition: border 0.2s, box-shadow 0.2s, background 0.2s;
+  font-size: 1.08rem;
+  user-select: none;
+}
+.language-card.selected, .language-card:hover {
+  border: 2px solid #3b5998;
+  background: #eaf1fb;
+  box-shadow: 0 4px 16px rgba(59,89,152,0.13);
+}
+.lang-code {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #3b5998;
+  margin-bottom: 0.2rem;
+}
+.lang-name {
+  font-size: 1.02rem;
+  color: #222;
+}
+
+.challenge-section {
+  margin-bottom: 2.2rem;
+}
+.challenge-label {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 1.1rem;
+  display: block;
+  text-align: center;
+  font-size: 1.08rem;
+}
+.challenge-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+.row-cards {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+@media (max-width: 900px) {
+  .row-cards {
+    flex-direction: column;
+    gap: 1.2rem;
+    align-items: center;
+  }
+}
+.challenge-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: none;
+  border: 2px solid #e0e0e0;
+  padding: 1.5rem 1.2rem 1.2rem 1.2rem;
+  min-width: 220px;
+  max-width: 300px;
+  margin-bottom: 0;
+  text-align: center;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: border 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.challenge-card.selected, .challenge-card:hover {
+  border: 2px solid #3b5998;
+  background: #f7faff;
+  box-shadow: 0 4px 16px rgba(59,89,152,0.13);
+}
+.checkmark {
+  color: #43a047;
+  font-weight: bold;
+  margin-right: 0.5em;
+  font-size: 1.1em;
+}
+.start-btn {
+  background: #3b5998;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.7rem 1.5rem;
+  font-size: 1.08rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: auto;
+  transition: background 0.2s;
+  box-shadow: none;
+}
+.start-btn:hover {
+  background: #29487d;
+}
+
+.progress-impact-card {
+  background: #f7faff;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(59,89,152,0.07);
+  padding: 1.2rem 1.5rem 1.2rem 1.5rem;
+  margin-top: 2.2rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+.progress-impact-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #3b5998;
+  margin-bottom: 0.7rem;
+}
+.progress-impact-list {
+  font-size: 1rem;
+  color: #222;
+  margin-bottom: 0.7rem;
+  padding-left: 1.2rem;
+}
+.progress-impact-list li {
+  margin-bottom: 0.2rem;
+  list-style: disc;
+}
+.current-points {
+  font-size: 1.02rem;
+  color: #3b5998;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .language-cards, .challenge-cards {
+    flex-direction: column;
+    gap: 1.2rem;
+    align-items: center;
+  }
+  .language-card, .challenge-card {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+  .progress-impact-card {
+    padding: 1rem 0.5rem;
+  }
+}
+
+/* Milestone Progress Bar Gradient (Image 2 style) */
+.milestone-bar-gradient {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+  height: 16px;
+  background: linear-gradient(90deg, #2196f3 0%, #43e97b 50%, #f9d423 100%);
+  border-radius: 8px;
+  margin-bottom: 38px;
+  margin-top: 32px;
+}
+.milestone-bar-gradient .milestone-step {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 33.33%;
+  z-index: 2;
+}
+.milestone-bar-gradient .milestone-step:nth-child(1) { left: 0%; }
+.milestone-bar-gradient .milestone-step:nth-child(2) { left: 50%; transform: translate(-50%, -50%); }
+.milestone-bar-gradient .milestone-step:nth-child(3) { right: 0%; }
+.milestone-bar-gradient .milestone-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid #bbb;
+  color: #bbb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  transition: border 0.3s, color 0.3s, background 0.3s;
+}
+.milestone-bar-gradient .milestone-step.achieved .milestone-circle {
+  border-color: #43e97b;
+  color: #43e97b;
+  background: #e6fff3;
+}
+.milestone-bar-gradient .milestone-step.current .milestone-circle {
+  border-color: #2196f3;
+  color: #2196f3;
+  background: #e3f2fd;
+  box-shadow: 0 0 0 4px #2196f355;
+}
+.milestone-bar-gradient .milestone-step:last-child.achieved .milestone-circle {
+  border-color: #f9d423;
+  color: #f9d423;
+  background: #fffbe6;
+}
+.milestone-bar-gradient .milestone-label {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 2px;
+  color: #222;
+  margin-top: 2px;
+}
+.milestone-bar-gradient .milestone-points {
+  font-size: 0.95rem;
+  color: #888;
+}
+.milestone-bar-gradient .milestone-range {
+  font-size: 0.9rem;
+  color: #bbb;
+  margin-bottom: 2px;
+}
+@media (max-width: 700px) {
+  .milestone-bar-gradient .milestone-circle { width: 36px; height: 36px; font-size: 1.1rem; }
+}
+/* Remove old milestone-bar and milestone-step CSS if present */
+.milestone-bar, .milestone-bar-container, .milestone-step, .milestone-circle { all: unset; }
