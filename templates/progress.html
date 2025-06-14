@@ -1191,7 +1191,7 @@
                 }
                 
                 // Set the progress width
-                tracker.style.setProperty('--progress-width', ${progressWidth}%);
+                tracker.style.setProperty('--progress-width', `${progressWidth}%`);
                 
                 // Update next rank animation
                 tracker.querySelectorAll('.level').forEach(level => {
@@ -1199,7 +1199,7 @@
                 });
                 
                 // Add active class to current level
-                const currentLevelElement = tracker.querySelector(.level.${currentLevel});
+                const currentLevelElement = tracker.querySelector(`.level.${currentLevel}`);
                 if (currentLevelElement) {
                     currentLevelElement.classList.add('active');
                 }
@@ -1209,7 +1209,7 @@
                 const currentIndex = levels.indexOf(currentLevel);
                 if (currentIndex < levels.length - 1) {
                     const nextRankClass = levels[currentIndex + 1];
-                    const nextRank = tracker.querySelector(.level.${nextRankClass});
+                    const nextRank = tracker.querySelector(`.level.${nextRankClass}`);
                     if (nextRank) {
                         nextRank.classList.add('next-rank');
                     }
