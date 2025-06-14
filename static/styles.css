@@ -20,12 +20,12 @@ body.transitioning {
 }
 
 body.login-bg {
-  background: url('/static/language_learning_chatbot_background_reg.jpg') no-repeat center center fixed !important;
+  background: url('../static/language_learning_chatbot_background_reg.jpg') no-repeat center center fixed !important;
   background-size: cover !important;
 }
 
 body.register-bg {
-  background: url('/static/language_learning_chatbot_background_reg.jpg') no-repeat center center fixed !important;
+  background: url('../static/language_learning_chatbot_background_reg.jpg') no-repeat center center fixed !important;
   background-size: cover !important;
 }
 
@@ -39,8 +39,11 @@ body.register-bg {
   top: 20px;
   right: 30px;
   z-index: 1000;
-  background: none;
-  padding: 0;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 10px;
+  border-radius: 50%;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .switch {
@@ -60,7 +63,7 @@ body.register-bg {
   position: absolute;
   inset: 0;
   background-color: #ccc;
-  border-radius: 50%;
+  border-radius: 34px;
   transition: 0.4s;
   cursor: pointer;
 }
@@ -75,6 +78,7 @@ body.register-bg {
   background-color: white;
   transition: 0.4s;
   border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 input:checked + .slider {
@@ -83,6 +87,24 @@ input:checked + .slider {
 
 input:checked + .slider:before {
   transform: translateX(26px);
+}
+
+/* Dark mode styles for toggle */
+body.dark-mode .toggle-container {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+body.dark-mode .slider {
+  background-color: #444;
+}
+
+body.dark-mode .slider:before {
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode input:checked + .slider {
+  background-color: #64B5F6;
 }
 
 /* Sidebar */

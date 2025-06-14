@@ -1132,12 +1132,8 @@ def quiz_questions():
     difficulty = request.args.get('difficulty') or request.form.get('difficulty')
     user_id = session.get('user_id')
 
-    # If it's a GET request, fetch new random questions and store in session
     if request.method == 'GET':
-        # Clear any previous quiz results from the session
         session.pop('quiz_result', None)
-
-        print(f"[DEBUG] GET /quiz/questions: Language={language}, Difficulty={difficulty}") # Debug log
         questions = []
         if language and difficulty:
             with get_db_connection() as conn:
@@ -1146,19 +1142,15 @@ def quiz_questions():
                     (language, difficulty.lower())
                 ).fetchall()
 
-                # Process fetched questions to parse options/explanations as needed
                 for q in db_questions:
                     options = json.loads(q['options']) if q['options'] else []
+                    points = q['points'] or 10  # Default to 10 points if not specified
 
-                    # Replicate question processing logic for display
                     if q['question_type'] == 'word_matching' and options:
-                        # Handle both old and new word matching formats
                         pairs = []
                         if isinstance(options, dict) and 'pairs' in options:
-                            # Newer format: {"pairs": [{"key": "Dog", "value": "狗 (Gǒu)"}], "format": "key_value_matching"}
                             pairs = [(pair['key'], pair['value']) for pair in options['pairs']]
                         elif isinstance(options, list):
-                            # Older format: [["Dog", "狗 (Gǒu)"], ["Cat", "猫 (Māo)"]]
                             pairs = [(pair[0], pair[1]) for pair in options]
                         
                         if pairs:
@@ -1171,64 +1163,28 @@ def quiz_questions():
                                 'id': q['id'],
                                 'question': q['question'],
                                 'options': processed_options,
-                                'original_options': pairs, # Store normalized pairs for grading
+                                'original_options': pairs,
                                 'answer': q['answer'],
                                 'question_type': q['question_type'],
-                                'points': q['points']
+                                'points': points
                             })
-                    elif q['question_type'] in ['error_spotting', 'idiom_interpretation', 'cultural_nuances'] and options and isinstance(options, dict):
-                        questions.append({
-                            'id': q['id'],
-                            'question': q['question'],
-                            'options': options.get('options', []), # Extract the list of options
-                            'original_options': options,  # Store the full dict for explanation
-                            'answer': q['answer'],
-                            'question_type': q['question_type'],
-                            'points': q['points']
-                        })
-                    elif q['question_type'] == 'fill_in_the_blanks' and options and isinstance(options, dict):
-                         questions.append({
-                             'id': q['id'],
-                             'question': q['question'],
-                             'options': options, # Store the hint dict
-                             'original_options': options, # Keep original for consistency
-                             'answer': q['answer'],
-                             'question_type': q['question_type'],
-                             'points': q['points']
-                         })
-                    elif q['question_type'] == 'complex_rephrasing' and options and isinstance(options, dict):
-                         questions.append({
-                             'id': q['id'],
-                             'question': q['question'],
-                             'options': options.get('options', []), # Extract the list of options
-                             'original_options': options,  # Keep original for consistency
-                             'answer': q['answer'],
-                             'question_type': q['question_type'],
-                             'points': q['points']
-                         })
                     else:
-                        # For other types, options are already a list or simple value
                         questions.append({
                             'id': q['id'],
                             'question': q['question'],
-                            'options': options, # Options should already be in the correct format (list or string)
-                            'original_options': options, # Keep original for consistency
+                            'options': options,
+                            'original_options': options,
                             'answer': q['answer'],
                             'question_type': q['question_type'],
-                            'points': q['points']
+                            'points': points
                         })
 
-        # Store the fetched and processed questions in the session for the POST request
         session['quiz_questions'] = questions
         session['quiz_start_time'] = time.time()
-        print(f"[DEBUG] GET /quiz/questions: Stored {len(questions)} questions in session.") # Debug log
         return render_template('quiz_questions.html', language=language, difficulty=difficulty, questions=questions)
 
     # POST: grade answers
-    # Retrieve questions from the session to grade against the correct set
-    print(f"[DEBUG] POST /quiz/questions: Attempting to retrieve questions from session.") # Debug log
     questions = session.get('quiz_questions', [])
-    print(f"[DEBUG] POST /quiz/questions: Retrieved {len(questions)} questions from session.") # Debug log
     if not questions:
         flash('Could not retrieve quiz questions from session. Please try the quiz again.', 'danger')
         return redirect(url_for('quiz_select'))
@@ -1238,340 +1194,86 @@ def quiz_questions():
     end_time = time.time()
     time_taken = int(end_time - start_time)
     correct = 0
-    # total = len(questions) # Total is now based on the number of questions retrieved from session
+    total_points = 0
     review = []
 
-    # Create a dictionary of questions by ID for easy lookup from the session questions
-    questions_by_id = {q['id']: q for q in questions}
-
-    # Iterate over submitted answers to grade
-    # Exclude language and difficulty fields from user_answers
-    question_answers = {}
-    for key, value in user_answers.items():
-        if key.startswith('q'):
-            # Extract question ID, handling the '_matches' suffix for word matching
-            if key.endswith('_matches'):
-                qid_str = key[1:- len('_matches')]
-            else:
-                qid_str = key[1:]
-
-            try:
-                qid = int(qid_str)
-                if qid not in question_answers:
-                    question_answers[qid] = {}
-                if key.endswith('_matches'):
-                    # Store the raw JSON string for word matching
-                    question_answers[qid]['word_matching_matches'] = value
-                else:
-                    # Store the answer for other types
-                    question_answers[qid]['answer'] = value
-            except ValueError:
-                print(f"Warning: Could not parse question ID from key: {key}")
-                continue # Skip this key if QID is not a valid integer
-
-    # Iterate over the questions from the session to ensure all are considered, even if no answer submitted
     for q in questions:
         qid = q['id']
-        user_ans_data = question_answers.get(qid, {})
-
-        # qid = int(qid_str) # This line is no longer needed here
-        # user_ans_raw = user_answers.get(qid_str) # This line is no longer needed here
-
-        # q = questions_by_id.get(qid) # This lookup is no longer needed here as we iterate over questions directly
-
-        # if q: # This check is implicitly handled by iterating over 'questions'
-        user_ans = None
+        user_ans_data = user_answers.get(f'q{qid}', {})
         is_correct = False
-        correct_ans = ''
-        explanation = ''
+        points_earned = 0
 
-        # Get the original options and question type from the session question
-        original_options = q.get('original_options', q.get('options'))
-        question_type = q['question_type']
+        if q['question_type'] == 'word_matching':
+            try:
+                user_matches = json.loads(user_answers.get(f'q{qid}_matches', '[]'))
+                correct_pairs = q['original_options']
+                is_correct = Counter(tuple(pair) for pair in user_matches) == Counter(tuple(pair) for pair in correct_pairs)
+                points_earned = q['points'] if is_correct else 0
+            except (json.JSONDecodeError, TypeError):
+                is_correct = False
+                points_earned = 0
+        else:
+            user_ans = str(user_ans_data).strip().lower()
+            correct_answers = [a.strip().lower() for a in str(q['answer']).split(';')]
+            is_correct = user_ans in correct_answers
+            points_earned = q['points'] if is_correct else 0
 
-        # Grading logic based on question type
-        if question_type in ['multiple_choice', 'fill_in_the_blanks', 'phrase_completion', 'context_response']:
-             user_ans_raw = user_ans_data.get('answer')
-             if user_ans_raw is not None:
-                 user_ans = str(user_ans_raw).strip()
-             else:
-                 user_ans = "" # Or handle missing answer
+        if is_correct:
+            correct += 1
+            total_points += points_earned
 
-             correct_answers = [a.strip().lower() for a in str(q['answer']).split(';')]
-             is_correct = user_ans.lower() in correct_answers
-             correct_ans = q['answer']
-
-        elif question_type == 'word_matching':
-             # For word matching, user_ans_raw is a JSON string of selected pairs
-             try:
-                 user_matches_raw = user_ans_data.get('word_matching_matches')
-                 if user_matches_raw is not None:
-                     user_matches = json.loads(user_matches_raw)
-                 else:
-                     user_matches = [] # Handle missing word matching data
-
-                 user_ans = user_matches # Store the parsed list of pairs
-                 # Correct pairs are in original_options for word_matching
-                 correct_pairs = [list(pair) for pair in original_options]
-                 # Compare sets of tuples for order-independent matching
-                 is_correct = Counter(tuple(pair) for pair in user_matches) == Counter(tuple(pair) for pair in correct_pairs)
-                 correct_ans = user_matches if is_correct else correct_pairs # Show user's answer if correct, otherwise correct pairs
-             except (json.JSONDecodeError, TypeError):
-                 user_ans = [] # Invalid JSON
-                 is_correct = False
-                 correct_ans = [list(pair) for pair in original_options] # Show correct pairs on error
-                 flash(f'Error processing word matching answer for question {qid}. Please try the quiz again.', 'warning')
-
-        elif question_type in ['error_spotting', 'idiom_interpretation', 'cultural_nuances', 'complex_rephrasing']:
-              user_ans_raw = user_ans_data.get('answer')
-              if user_ans_raw is not None:
-                  user_ans = str(user_ans_raw).strip()
-              else:
-                  user_ans = "" # Or handle missing answer
-
-              correct_ans = str(q['answer']).strip() # Correct answer is stored in the 'answer' field, strip it
-
-              # Debug log for comparison values
-              print(f"[DEBUG] QID {qid} ({question_type}) Grading: User='{user_ans.lower()}', Correct='{correct_ans.lower()}'")
-
-              is_correct = user_ans.lower() == correct_ans.lower() # Compare stripped and lowercased answers
-
-              # Special handling for complex_rephrasing to ignore ending punctuation
-              if question_type == 'complex_rephrasing':
-                  user_ans_cleaned = user_ans.rstrip('.?! ') # Strip ., ?, !, and space from end
-                  correct_ans_cleaned = correct_ans.rstrip('.?! ') # Strip ., ?, !, and space from end
-                  is_correct = user_ans_cleaned.lower() == correct_ans_cleaned.lower()
-
-              # Extract explanation if available in original_options (for types that have it)
-              if question_type in ['error_spotting', 'idiom_interpretation', 'cultural_nuances']:
-                   if isinstance(original_options, dict):
-                        explanation = original_options.get('explanation', '')
-
-
-         # Append result to review list
         review.append({
-             'question': q['question'],
-             'type': question_type,
-             'user_answer': user_ans,
-             'correct_answer': correct_ans,
-             'is_correct': is_correct,
-             'options': {'explanation': explanation} if explanation else None # Include explanation if found
-         })
+            'question': q['question'],
+            'user_answer': user_ans_data,
+            'correct_answer': q['answer'],
+            'is_correct': is_correct,
+            'points_earned': points_earned
+        })
 
-    # If question not found in session questions (shouldn't happen with correct flow)
-    # else:
-    #     print(f"Warning: Question with ID {qid} not found in session questions for grading. This answer will be skipped.")
-    #     # Optionally add a placeholder review item or handle as error
+    # Calculate bonuses
+    streak_bonus = 0
+    time_bonus = 0
 
-    # Update total and correct based on processed review items
-    total = len(review)
-    correct = sum(item['is_correct'] for item in review)
-
-    # Points system (re-calculated based on the graded questions)
-    points_per = {'Beginner': 1, 'Intermediate': 3, 'Advanced': 5}
-    bonus_perfect = {'Beginner': 5, 'Intermediate': 8, 'Advanced': 10}
-    points = correct * points_per.get(difficulty, 1) # Use difficulty from form
-    bonus = 0
-    if correct == total:
-        bonus += bonus_perfect.get(difficulty, 0) # Use difficulty from form
-    if time_taken < 60: # Time bonus logic remains
-        bonus += 5
-
-    # Streaks (simple: check last 5 quizzes) - logic seems okay, uses user_id
     with get_db_connection() as conn:
-         last_quizzes = conn.execute("SELECT passed FROM quiz_results_enhanced WHERE user_id = ? ORDER BY timestamp DESC LIMIT 5", (user_id,)).fetchall()
-         streak = 0
-         for qz in last_quizzes:
-             if qz['passed']:
-                 streak += 1
-             else:
-                 break
-         # If current quiz is perfect and there was a streak, extend it
-         if correct == total and (not last_quizzes or last_quizzes[0]['passed']):
-             streak += 1
-         # Apply streak bonus only if streak is > 1 after this quiz
-         if streak > 1:
-             bonus += 5 # Add streak bonus
+        last_quiz = conn.execute(
+            "SELECT passed FROM quiz_results_enhanced WHERE user_id = ? ORDER BY timestamp DESC LIMIT 1",
+            (user_id,)
+        ).fetchone()
+        
+        if last_quiz and last_quiz['passed']:
+            streak_bonus = 5  # 5 points bonus for maintaining streak
 
-    total_points = points + bonus
+    if time_taken < 300:  # 5 minutes
+        time_bonus = int(10 * (1 - time_taken / 300))
 
-    # Save result using language and difficulty from form
+    final_score = total_points + streak_bonus + time_bonus
+    passed = (correct / len(questions)) >= 0.7  # 70% threshold to pass
+
     with get_db_connection() as conn:
-        # Capitalize difficulty for legacy table
-        difficulty_cap = difficulty.capitalize() if difficulty else ''
-        conn.execute(
-            "INSERT INTO quiz_results_enhanced (user_id, language, difficulty, score, total, percentage, passed, timestamp, question_details, points_earned, streak_bonus, time_bonus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, language, difficulty, correct, total, (correct/total)*100, int(correct==total), datetime.now(), json.dumps(review), points, 5 if streak > 1 else 0, 5 if time_taken < 60 else 0)
-        )
-        # --- Add this block to also insert into legacy quiz_results for progress tracking ---
-        conn.execute(
-            "INSERT INTO quiz_results (user_id, language, difficulty, score, total, timestamp) VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, language, difficulty_cap, correct, total, datetime.now())
-        )
-        conn.commit()
-        
-        # Create quiz completion notification
-        percentage_score = int((correct/total)*100)
-        quiz_notification = f"You scored {correct}/{total} ({percentage_score}%) in {language} {difficulty} quiz"
-        add_notification(user_id, quiz_notification)
-        
-        # Create achievement notifications for special scores
-        if correct == total:  # Perfect score
-            add_notification(user_id, "🎉 Perfect Score! You got 100% on your quiz!")
-        elif percentage_score >= 90:  # Excellent score
-            add_notification(user_id, "⭐ Excellent! You scored 90% or higher!")
-        elif percentage_score >= 80:  # Good score
-            add_notification(user_id, "👍 Good job! You're making great progress!")
-        
-        # === ACHIEVEMENT UNLOCK LOGIC ===
-        # Helper to check if achievement already unlocked
-        def has_achievement(user_id, ach_type):
-            return conn.execute(
-                'SELECT 1 FROM achievements WHERE user_id = ? AND achievement_type = ?',
-                (user_id, ach_type)
-            ).fetchone() is not None
-        
-        now = datetime.now()
-        hour = now.hour
-        today = now.date()
-        # Only award global achievements if the quiz is taken in English
-        if language == 'English':
-            # Night Owl: Complete a quiz after midnight (00:00-05:59)
-            if 0 <= hour < 6 and not has_achievement(user_id, 'night_owl'):
-                conn.execute(
-                    'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                    (user_id, 'night_owl', 'Night Owl', 'Complete a quiz after midnight')
-                )
-            # Early Bird: Complete a quiz before 7am (05:00-06:59)
-            if 5 <= hour < 7 and not has_achievement(user_id, 'early_bird'):
-                conn.execute(
-                    'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                    (user_id, 'early_bird', 'Early Bird', 'Complete a quiz before 7am')
-                )
-            # Speed Demon: Finish a quiz in under 60 seconds
-            if time_taken < 60 and not has_achievement(user_id, 'speed_demon'):
-                conn.execute(
-                    'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                    (user_id, 'speed_demon', 'Speed Demon', 'Finish a quiz in record time')
-                )
-            # Hot Streak: 5 correct quizzes in a row
-            last_5 = conn.execute("SELECT passed FROM quiz_results_enhanced WHERE user_id = ? ORDER BY timestamp DESC LIMIT 5", (user_id,)).fetchall()
-            if len(last_5) == 5 and all(qz['passed'] for qz in last_5):
-                if not has_achievement(user_id, 'hot_streak'):
-                    conn.execute(
-                        'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                        (user_id, 'hot_streak', 'Hot Streak', '5 correct quizzes in a row')
-                    )
-            # Perfectionist: 100% in 3 quizzes in a row
-            last_3 = conn.execute("SELECT score, total FROM quiz_results_enhanced WHERE user_id = ? ORDER BY timestamp DESC LIMIT 3", (user_id,)).fetchall()
-            if len(last_3) == 3 and all(qz['score'] == qz['total'] for qz in last_3):
-                if not has_achievement(user_id, 'perfectionist'):
-                    conn.execute(
-                        'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                        (user_id, 'perfectionist', 'Perfectionist', 'Get 100% in 3 quizzes in a row')
-                    )
-            # Comeback Kid: Perfect score after failing a quiz
-            last_2 = conn.execute("SELECT score, total FROM quiz_results_enhanced WHERE user_id = ? ORDER BY timestamp DESC LIMIT 2", (user_id,)).fetchall()
-            if len(last_2) == 2 and last_2[1]['score'] < last_2[1]['total'] and last_2[0]['score'] == last_2[0]['total']:
-                if not has_achievement(user_id, 'comeback_kid'):
-                    conn.execute(
-                        'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                        (user_id, 'comeback_kid', 'Comeback Kid', 'Perfect score after failing a quiz')
-                    )
-            # Consistency Champ: Complete quizzes 5 days in a row
-            last_5_days = conn.execute("SELECT DISTINCT DATE(timestamp) as d FROM quiz_results_enhanced WHERE user_id = ? ORDER BY d DESC LIMIT 5", (user_id,)).fetchall()
-            if len(last_5_days) == 5:
-                days = [row['d'] for row in last_5_days]
-                days_dt = [datetime.strptime(d, '%Y-%m-%d').date() for d in days]
-                days_dt.sort()
-                if all((days_dt[i] - days_dt[i-1]).days == 1 for i in range(1, 5)):
-                    if not has_achievement(user_id, 'consistency_champ'):
-                        conn.execute(
-                            'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                            (user_id, 'consistency_champ', 'Consistency Champ', 'Complete quizzes 5 days in a row')
-                        )
-            # Quick Thinker: 5 correct answers under 10 seconds each (in this quiz)
-            quick_count = 0
-            for item in review:
-                if item['is_correct'] and isinstance(item['user_answer'], str) and time_taken/total < 10:
-                    quick_count += 1
-            if quick_count >= 5 and not has_achievement(user_id, 'quick_thinker'):
-                conn.execute(
-                    'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                    (user_id, 'quick_thinker', 'Quick Thinker', '5 correct answers under 10 seconds each')
-                )
-        # Per-language achievements (leave as is)
-        # ... existing code for per-language achievements ...
-        # Basic Vocab: 300 points in Beginner quizzes (per language)
-        beginner_pts = conn.execute("SELECT SUM(points_earned) as pts FROM quiz_results_enhanced WHERE user_id = ? AND language = ? AND difficulty = 'Beginner'", (user_id, language)).fetchone()['pts'] or 0
-        if beginner_pts >= 300 and not has_achievement(user_id, f'basic_vocab_{language}'):
-            conn.execute(
-                'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                (user_id, f'basic_vocab_{language}', 'Basic Vocab', f'300 points in Beginner quizzes for {language}')
-            )
-        # Language Guru: Maintain a 5 quiz streak (per language)
-        last_5_lang = conn.execute("SELECT passed FROM quiz_results_enhanced WHERE user_id = ? AND language = ? ORDER BY timestamp DESC LIMIT 5", (user_id, language)).fetchall()
-        if len(last_5_lang) == 5 and all(qz['passed'] for qz in last_5_lang):
-            if not has_achievement(user_id, f'language_guru_{language}'):
-                conn.execute(
-                    'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                    (user_id, f'language_guru_{language}', 'Language Guru', f'Maintain a 5 quiz streak in {language}')
-                )
-        # Fluency Builder: Complete 10 Advanced quizzes (per language)
-        adv_count = conn.execute("SELECT COUNT(*) as cnt FROM quiz_results_enhanced WHERE user_id = ? AND language = ? AND difficulty = 'Advanced'", (user_id, language)).fetchone()['cnt'] or 0
-        if adv_count >= 10 and not has_achievement(user_id, f'fluency_builder_{language}'):
-            conn.execute(
-                'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                (user_id, f'fluency_builder_{language}', 'Fluency Builder', f'Complete 10 Advanced quizzes in {language}')
-            )
-        # Master of Language: Reach 1500 total points (per language)
-        total_pts = conn.execute("SELECT SUM(points_earned) as pts FROM quiz_results_enhanced WHERE user_id = ? AND language = ?", (user_id, language)).fetchone()['pts'] or 0
-        if total_pts >= 1500 and not has_achievement(user_id, f'master_of_language_{language}'):
-            conn.execute(
-                'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                (user_id, f'master_of_language_{language}', 'Master of Language', f'Reach 1500 total points in {language}')
-            )
-        # Quiz Explorer: Take quizzes in 5 different languages
-        lang_count = conn.execute("SELECT COUNT(DISTINCT language) as cnt FROM quiz_results_enhanced WHERE user_id = ?", (user_id,)).fetchone()['cnt'] or 0
-        if lang_count >= 5 and not has_achievement(user_id, 'quiz_explorer'):
-            conn.execute(
-                'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                (user_id, 'quiz_explorer', 'Quiz Explorer', 'Take quizzes in 5 different languages')
-            )
-        # Polyglot: Complete quizzes in all languages
-        all_langs = set(['English', 'Spanish', 'French', 'Tamil', 'Malay', 'Portuguese', 'Chinese'])
-        user_langs = set([row['language'] for row in conn.execute("SELECT DISTINCT language FROM quiz_results_enhanced WHERE user_id = ?", (user_id,)).fetchall()])
-        if all_langs.issubset(user_langs) and not has_achievement(user_id, 'polyglot'):
-            conn.execute(
-                'INSERT INTO achievements (user_id, achievement_type, achievement_name, description) VALUES (?, ?, ?, ?)',
-                (user_id, 'polyglot', 'Polyglot', 'Complete quizzes in all languages')
-            )
-        conn.commit()
-        
-        # Create streak notification
-        if streak > 1:
-            add_notification(user_id, f"🔥 Hot Streak! You're on a {streak} quiz winning streak!")
-        
-        # Create time bonus notification
-        if time_taken < 60:
-            add_notification(user_id, "⚡ Speed Bonus! You completed the quiz in under 60 seconds!")
+        conn.execute("""
+            INSERT INTO quiz_results_enhanced (
+                user_id, language, difficulty, score, total, points_earned,
+                streak_bonus, time_bonus, passed, question_details, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        """, (
+            user_id, language, difficulty, correct, len(questions),
+            total_points, streak_bonus, time_bonus, passed,
+            json.dumps(review)
+        ))
 
-    # Store the correct quiz result in session before redirecting
-    # session['quiz_result'] = {
-    #     'language': language, # Use language from form
-    #     'difficulty': difficulty, # Use difficulty from form
-    #     'correct': correct,
-    #     'total': total,
-    #     'time_taken': time_taken,
-    #     'review': review,
-    #     'points': points,
-    #     'bonus': bonus,
-    #     'total_points': total_points,
-    #     'streak': streak
-    # }
-    print(f"[DEBUG] POST /quiz/questions: Stored quiz_result in session for language {language}, difficulty {difficulty}.") # Debug log - kept for now, will remove once confirmed fixed
+    session['quiz_result'] = {
+        'language': language,
+        'difficulty': difficulty,
+        'correct': correct,
+        'total': len(questions),
+        'points': total_points,
+        'streak_bonus': streak_bonus,
+        'time_bonus': time_bonus,
+        'total_points': final_score,
+        'passed': passed,
+        'review': review
+    }
 
-    # Redirect to quiz_results without language/difficulty args, it will read from session
     return redirect(url_for('quiz_results'))
 
 @app.route('/quiz/results')
@@ -1642,11 +1344,11 @@ def progress():
         'recent_activity': [],
         'LEVEL_REQUIREMENTS': LEVEL_REQUIREMENTS
     }
+
     with get_db_connection() as conn:
-        # Fetch all achievements for the user once
         user_achievements = conn.execute('SELECT achievement_type FROM achievements WHERE user_id = ?', (user_id,)).fetchall()
         achievement_types = set([row['achievement_type'] for row in user_achievements])
-        # Split achievements
+        
         global_achievements = set()
         per_language_achievements = {}
         for ach in achievement_types:
@@ -1658,9 +1360,8 @@ def progress():
                     break
             if not found:
                 global_achievements.add(ach)
-        # Gather per-language stats
+
         for language in languages:
-            # Icon mapping for language
             icon_map = {
                 'English': 'flag-usa',
                 'Spanish': 'flag',
@@ -1672,118 +1373,125 @@ def progress():
             }
             icon = icon_map.get(language, 'flag')
             
-            # Get total points and quizzes from quiz_results_enhanced
-            with get_db_connection() as conn:
-                # Get total points earned for this language
-                points_result = conn.execute('''
-                    SELECT SUM(points_earned) as total_points 
-                    FROM quiz_results_enhanced 
-                    WHERE user_id = ? AND language = ?
-                ''', (user_id, language)).fetchone()
-                total_pts = points_result['total_points'] or 0
-                
-                # Get quiz counts by difficulty
-                quizzes = conn.execute('''
-                    SELECT difficulty, COUNT(*) as cnt 
-                    FROM quiz_results_enhanced 
-                    WHERE user_id = ? AND language = ? 
-                    GROUP BY difficulty
-                ''', (user_id, language)).fetchall()
-                
-                counts = {'beginner': 0, 'intermediate': 0, 'advanced': 0}
-                for row in quizzes:
-                    diff = row['difficulty'].lower()
-                    if diff in counts:
-                        counts[diff] += row['cnt']
-                
-                # Set current level based on total points
-                if total_pts >= 701:
-                    current_level = 'advanced'
-                elif total_pts >= 301:
-                    current_level = 'intermediate'
+            points_result = conn.execute('''
+                SELECT SUM(points_earned + streak_bonus + time_bonus) as total_points 
+                FROM quiz_results_enhanced 
+                WHERE user_id = ? AND language = ?
+            ''', (user_id, language)).fetchone()
+            total_pts = points_result['total_points'] or 0
+            
+            quizzes = conn.execute('''
+                SELECT difficulty, COUNT(*) as cnt 
+                FROM quiz_results_enhanced 
+                WHERE user_id = ? AND language = ? 
+                GROUP BY difficulty
+            ''', (user_id, language)).fetchall()
+            
+            counts = {'beginner': 0, 'intermediate': 0, 'advanced': 0}
+            for row in quizzes:
+                diff = row['difficulty'].lower()
+                if diff in counts:
+                    counts[diff] += row['cnt']
+            
+            if total_pts >= LEVEL_REQUIREMENTS['advanced']['points']:
+                current_level = 'advanced'
+            elif total_pts >= LEVEL_REQUIREMENTS['intermediate']['points']:
+                current_level = 'intermediate'
+            else:
+                current_level = 'beginner'
+            
+            if current_level == 'beginner':
+                progress_pct = (total_pts / LEVEL_REQUIREMENTS['beginner']['points']) * 100
+            elif current_level == 'intermediate':
+                progress_pct = ((total_pts - LEVEL_REQUIREMENTS['beginner']['points']) / 
+                              (LEVEL_REQUIREMENTS['intermediate']['points'] - LEVEL_REQUIREMENTS['beginner']['points'])) * 100
+            else:
+                progress_pct = ((total_pts - LEVEL_REQUIREMENTS['intermediate']['points']) / 
+                              (LEVEL_REQUIREMENTS['advanced']['points'] - LEVEL_REQUIREMENTS['intermediate']['points'])) * 100
+            
+            quizzes_taken = sum(counts.values())
+            
+            last_quizzes = conn.execute("""
+                SELECT passed 
+                FROM quiz_results_enhanced 
+                WHERE user_id = ? AND language = ? 
+                ORDER BY timestamp DESC LIMIT 10
+            """, (user_id, language)).fetchall()
+            
+            streak = 0
+            highest_streak = 0
+            temp_streak = 0
+            for qz in last_quizzes:
+                if qz['passed']:
+                    temp_streak += 1
+                    if temp_streak > highest_streak:
+                        highest_streak = temp_streak
                 else:
-                    current_level = 'beginner'
-                
-                # Quizzes taken
-                quizzes_taken = sum(counts.values())
-                
-                # Streaks (simple: check last 5 quizzes)
-                last_quizzes = conn.execute("""
-                    SELECT passed 
-                    FROM quiz_results_enhanced 
-                    WHERE user_id = ? AND language = ? 
-                    ORDER BY timestamp DESC LIMIT 10
-                """, (user_id, language)).fetchall()
-                
-                streak = 0
-                highest_streak = 0
-                temp_streak = 0
-                for qz in last_quizzes:
-                    if qz['passed']:
-                        temp_streak += 1
-                        if temp_streak > highest_streak:
-                            highest_streak = temp_streak
-                    else:
-                        temp_streak = 0
-                streak = temp_streak
-                
-                # Badges (populate from achievements)
-                badges = set()
-                # Add per-language achievements only
-                for ach in per_language_achievements.get(language, set()):
-                    if ach.startswith('basic_vocab_') and ach.endswith(language):
-                        badges.add('basic_vocab')
-                    elif ach.startswith('language_guru_') and ach.endswith(language):
-                        badges.add('language_guru')
-                    elif ach.startswith('fluency_builder_') and ach.endswith(language):
-                        badges.add('fluency_builder')
-                    elif ach.startswith('master_of_language_') and ach.endswith(language):
-                        badges.add('master_of_language')
-                
-                # Add global achievements ONLY for English
-                if language == 'English':
-                    for ach in global_achievements:
-                        if ach in [
-                            'hot_streak', 'night_owl', 'early_bird', 'polyglot', 'comeback_kid',
-                            'speed_demon', 'consistency_champ', 'quick_thinker', 'quiz_explorer', 'perfectionist'
-                        ]:
-                            badges.add(ach)
-                
-                # Recent activity for this language
-                recent_activity = conn.execute("""
-                    SELECT * FROM quiz_results_enhanced 
-                    WHERE user_id = ? AND language = ? 
-                    ORDER BY timestamp DESC LIMIT 5
-                """, (user_id, language)).fetchall()
-                
-                activity_list = []
-                for act in recent_activity:
-                    activity_list.append({
-                        'language': language,
-                        'difficulty': act['difficulty'],
-                        'score': act['score'],
-                        'total': act['total'],
-                        'timestamp': act['timestamp'],
-                        'passed': act['passed'],
-                        'points_earned': act['points_earned'],
-                        'streak_bonus': act['streak_bonus'],
-                        'time_bonus': act['time_bonus']
-                    })
-                
-                # Compose per-language dict
-                progress_dict['progress'][language] = {
-                    'icon': icon,
-                    'total_points': total_pts,
-                    'quizzes_taken': quizzes_taken,
-                    'current_level': current_level,
-                    'badges': list(badges),
-                    'streak': streak,
-                    'highest_streak': highest_streak,
-                    'next_level': True if current_level != 'advanced' else False,
-                }
-                progress_dict['recent_activity'].extend(activity_list)
-                progress_dict['total_points'] += total_pts
-                progress_dict['total_quizzes'] += quizzes_taken
+                    temp_streak = 0
+            streak = temp_streak
+            
+            badges = set()
+            for ach in per_language_achievements.get(language, set()):
+                if ach.startswith('basic_vocab_') and ach.endswith(language):
+                    badges.add('basic_vocab')
+                elif ach.startswith('language_guru_') and ach.endswith(language):
+                    badges.add('language_guru')
+                elif ach.startswith('fluency_builder_') and ach.endswith(language):
+                    badges.add('fluency_builder')
+                elif ach.startswith('master_of_language_') and ach.endswith(language):
+                    badges.add('master_of_language')
+            
+            if language == 'English':
+                for ach in global_achievements:
+                    if ach in [
+                        'hot_streak', 'night_owl', 'early_bird', 'polyglot', 'comeback_kid',
+                        'speed_demon', 'consistency_champ', 'quick_thinker', 'quiz_explorer', 'perfectionist'
+                    ]:
+                        badges.add(ach)
+            
+            recent_activity = conn.execute("""
+                SELECT * FROM quiz_results_enhanced 
+                WHERE user_id = ? AND language = ? 
+                ORDER BY timestamp DESC LIMIT 5
+            """, (user_id, language)).fetchall()
+            
+            activity_list = []
+            for act in recent_activity:
+                activity_list.append({
+                    'language': language,
+                    'difficulty': act['difficulty'],
+                    'score': act['score'],
+                    'total': act['total'],
+                    'timestamp': act['timestamp'],
+                    'passed': act['passed'],
+                    'points_earned': act['points_earned'],
+                    'streak_bonus': act['streak_bonus'],
+                    'time_bonus': act['time_bonus']
+                })
+            
+            progress_dict['progress'][language] = {
+                'icon': icon,
+                'total_points': total_pts,
+                'quizzes_taken': quizzes_taken,
+                'current_level': current_level,
+                'progress_percentage': min(100, max(0, progress_pct)),
+                'badges': list(badges),
+                'streak': streak,
+                'highest_streak': highest_streak,
+                'next_level': True if current_level != 'advanced' else False,
+                'points_to_next': (
+                    LEVEL_REQUIREMENTS['intermediate']['points'] - total_pts if current_level == 'beginner'
+                    else LEVEL_REQUIREMENTS['advanced']['points'] - total_pts if current_level == 'intermediate'
+                    else 0
+                )
+            }
+            progress_dict['recent_activity'].extend(activity_list)
+            progress_dict['total_points'] += total_pts
+            progress_dict['total_quizzes'] += quizzes_taken
+
+    progress_dict['recent_activity'].sort(key=lambda x: x['timestamp'], reverse=True)
+    progress_dict['recent_activity'] = progress_dict['recent_activity'][:5]
+
     return render_template('progress.html', progress=progress_dict)
 
 @app.route('/admin/import-questions', methods=['POST'])
