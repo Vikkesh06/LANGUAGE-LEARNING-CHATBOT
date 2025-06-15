@@ -1370,11 +1370,46 @@ def quiz_questions():
     # Points system (re-calculated based on the graded questions)
     points_per = {'Beginner': 1, 'Intermediate': 3, 'Advanced': 5}
     bonus_perfect = {'Beginner': 5, 'Intermediate': 8, 'Advanced': 10}
-    points = correct * points_per.get(difficulty, 1) # Use difficulty from form
+    
+    # Calculate user's current level dynamically based on their points in this language
+    with get_db_connection() as conn:
+        quizzes_enhanced = conn.execute('''
+            SELECT difficulty, COUNT(*) as cnt 
+            FROM quiz_results_enhanced 
+            WHERE user_id = ? AND language = ? 
+            GROUP BY difficulty
+        ''', (user_id, language)).fetchall()
+        counts = {'beginner': 0, 'intermediate': 0, 'advanced': 0}
+        for row in quizzes_enhanced:
+            diff = row['difficulty'].lower()
+            if diff in counts:
+                counts[diff] = row['cnt']
+        # Calculate points for each level
+        beginner_pts = min(counts['beginner'], 300)
+        intermediate_pts = min(counts['intermediate'] * 3, 400) if beginner_pts >= 300 else 0
+        advanced_pts = min(counts['advanced'] * 5, 800) if intermediate_pts >= 400 else 0
+        total_pts = beginner_pts + intermediate_pts + advanced_pts
+        if total_pts >= 701:
+            current_level = 'advanced'
+        elif total_pts >= 301:
+            current_level = 'intermediate'
+        else:
+            current_level = 'beginner'
+    # Calculate points based on current level and quiz difficulty
+    points = 0
+    if current_level == 'beginner':
+        points = correct * points_per.get(difficulty, 1)
+    elif current_level == 'intermediate':
+        if difficulty in ['Intermediate', 'Advanced']:
+            points = correct * points_per.get(difficulty, 3)
+    elif current_level == 'advanced':
+        if difficulty == 'Advanced':
+            points = correct * points_per.get(difficulty, 5)
+    # Calculate bonus
     bonus = 0
     if correct == total:
-        bonus += bonus_perfect.get(difficulty, 0) # Use difficulty from form
-    if time_taken < 60: # Time bonus logic remains
+        bonus = bonus_perfect.get(difficulty, 0)
+    if time_taken < 60:
         bonus += 5
 
     # Streaks (simple: check last 5 quizzes) - logic seems okay, uses user_id
@@ -1671,33 +1706,33 @@ def progress():
                 'Japanese': 'flag'
             }
             icon = icon_map.get(language, 'flag')
-            # Points and quizzes
-            quizzes_legacy = conn.execute('SELECT difficulty, COUNT(*) as cnt FROM quiz_results WHERE user_id = ? AND language = ? GROUP BY difficulty', (user_id, language)).fetchall()
-            quizzes_enhanced = conn.execute('SELECT difficulty, COUNT(*) as cnt FROM quiz_results_enhanced WHERE user_id = ? AND language = ? GROUP BY difficulty', (user_id, language)).fetchall()
+            
+            # Get quiz counts from enhanced table only to avoid double counting
+            quizzes_enhanced = conn.execute('''
+                SELECT difficulty, COUNT(*) as cnt 
+                FROM quiz_results_enhanced 
+                WHERE user_id = ? AND language = ? 
+                GROUP BY difficulty
+            ''', (user_id, language)).fetchall()
+            
             counts = {'beginner': 0, 'intermediate': 0, 'advanced': 0}
-            for row in quizzes_legacy:
-                diff = row['difficulty'].lower()
-                if diff in counts:
-                    counts[diff] += row['cnt']
             for row in quizzes_enhanced:
                 diff = row['difficulty'].lower()
                 if diff in counts:
-                    counts[diff] += row['cnt']
-            beginner_pts = counts['beginner']
-            intermediate_pts = counts['intermediate']
-            advanced_pts = counts['advanced']
-            beginner_pts = min(beginner_pts, 300)
-            if beginner_pts < 300:
-                intermediate_pts = 0
-                advanced_pts = 0
-            else:
-                intermediate_pts = min(intermediate_pts, 400)
-                if intermediate_pts < 400:
-                    advanced_pts = 0
-                else:
-                    advanced_pts = min(advanced_pts, 800)
+                    counts[diff] = row['cnt']
+            
+        
+        
+            # Calculate points based on current level
+            beginner_pts = 0
+            intermediate_pts = 0
+            advanced_pts = 0
+            # Calculate points for each level
+            beginner_pts = min(counts['beginner'], 300)
+            intermediate_pts = min(counts['intermediate'] * 3, 400) if beginner_pts >= 300 else 0
+            advanced_pts = min(counts['advanced'] * 5, 800) if intermediate_pts >= 400 else 0
             total_pts = beginner_pts + intermediate_pts + advanced_pts
-            # Set current level
+            
             if total_pts >= 701:
                 current_level = 'advanced'
             elif total_pts >= 301:
@@ -2695,42 +2730,25 @@ def blip_caption():
         return jsonify({'error': 'No image file provided'}), 400
     image_file = request.files['image']
     try:
-        import torch
         from PIL import Image
-        from transformers import CLIPProcessor, CLIPModel
+        from transformers import BlipProcessor, BlipForConditionalGeneration
         
-        # Load CLIP model and processor
-        model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-        processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+        # Load BLIP model and processor
+        processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+        model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
         
         # Process the image
         image = Image.open(image_file).convert('RGB')
-        inputs = processor(images=image, return_tensors="pt", padding=True)
+        inputs = processor(image, return_tensors="pt")
         
-        # Generate image features
-        image_features = model.get_image_features(**inputs)
-        
-        # Get text features for common image descriptions
-        text_inputs = processor.tokenizer(
-            ["a photo of a person", "a photo of an object", "a photo of a scene", 
-             "a photo of an animal", "a photo of food", "a photo of nature"],
-            padding=True, return_tensors="pt"
-        )
-        text_features = model.get_text_features(**text_inputs)
-        
-        # Calculate similarity
-        similarity = torch.nn.functional.cosine_similarity(image_features, text_features)
-        best_match_idx = similarity.argmax().item()
-        
-        # Get the best matching description
-        descriptions = ["a photo of a person", "a photo of an object", "a photo of a scene", 
-                       "a photo of an animal", "a photo of food", "a photo of nature"]
-        caption = descriptions[best_match_idx]
+        # Generate caption
+        out = model.generate(**inputs)
+        caption = processor.decode(out[0], skip_special_tokens=True)
         
         return jsonify({'caption': caption})
     except Exception as e:
-        print(f"CLIP image captioning error: {e}")
-        return jsonify({'error': 'CLIP image captioning failed. Please ensure all dependencies are installed.'}), 500
+        print(f"BLIP image captioning error: {e}")
+        return jsonify({'error': 'BLIP image captioning failed. Please ensure all dependencies are installed.'}), 500
 
 @app.route('/close_account', methods=['POST'])
 def close_account():
